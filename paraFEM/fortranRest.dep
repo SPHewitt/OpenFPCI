@@ -1,0 +1,6 @@
+$(OBJECTS_DIR)/fortranRest.o: solidSolvers/paraFEM/fortranRest.dep
+solidSolvers/paraFEM/fortranRest.dep: solidSolvers/paraFEM/fortranRest.C
+$(OBJECTS_DIR)/fortranRest.o: $(EXE_DEP)
+$(OBJECTS_DIR)/fortranRest.o:
+	@SOURCE_DIR=solidSolvers/paraFEM
+	SOURCE=solidSolvers/paraFEM/fortranRest.C ; $(Ctoo)
