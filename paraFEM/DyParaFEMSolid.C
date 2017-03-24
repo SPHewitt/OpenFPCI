@@ -41,7 +41,6 @@ License
 
 using namespace rbf;
 
-
 // * * * * * * * * * * * * ParaFEM Fortran Subroutines* * * * * * * * * * * * //
 // - Will need editing when more complex elements introduced
 const int nod = 8;       // Element type
