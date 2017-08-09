@@ -34,20 +34,17 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "RBFInterpolation.H"
 #include "TPSFunction.H"
-#include "fortranRest.H"
-#include <ctime>
-#include <iostream>
-#include <fstream>
-#include <time.h>
-#include <ctime>
+#include "ZoneIDs.H"
+#include "primitivePatchInterpolation.H"
 
 using namespace rbf;
 
+
 // * * * * * * * * * * * * ParaFEM Fortran Subroutines* * * * * * * * * * * * //
 // - Will need editing when more complex elements introduced
-const int nod = 8;       // Element type
-const int ndim = 3;	 // Number of Dimensions
-const int ntot=ndim*nod; // ntot
+const int nod 	=  8;        // Element type
+const int ndim 	=  3;	     // Number of Dimensions
+const int ntot	=  ndim*nod; // ntot
 
 using namespace std;
 
@@ -61,16 +58,15 @@ extern"C"
     void initparafem_
     (
         double* g_coord,	
-        int* g_num,
+        int* g_num_pp,
         int* rest,
         int* nn, 
         const int* nels,
         const int* nr,
-		double* SolidProperties,
+	double* SolidProperties,
         int* g_g_pp,
-		double* stiff,
-		double* mass,
-		int* g_num_pp
+	double* stiff,
+	double* mass
     );
 
     // return number of equations/proc 
@@ -78,6 +74,13 @@ extern"C"
 
     // return number of cells/proc
     int findnelspp_();
+
+    // return number of cells/proc
+    int setnelspp_
+    (
+	const int* numCells
+//	int* numProcessors
+    );
 
     // Calculate number of cells/proc
     int calcnelsppof_
@@ -90,8 +93,8 @@ extern"C"
     void finddiagparafem_
     (
         double* stiff,
-		double* mass,
-		double* NumericalVariables,
+	double* mass,
+	double* NumericalVariables,
         double* precon
     );
 
@@ -108,21 +111,21 @@ extern"C"
     // Solve the structural equation
     void runparafem_
     (
-		double* NumericalVariables,
+	double* NumericalVariables,
         double* f_ext, 
         int* f_node,
         int* solidPatchIDSize,
-		double* paraFemSolidDisp,
-		double* paraFemSolidVel,
-		double* paraFemSolidAcel,
-		double* time,
+	double* time,
         int* nn,
         int* g_g_pp,
         int* g_num_pp,
-		double* stiff,
-		double* mass,
+	double* stiff,
+	double* mass,
         double* precon,
-		double* gravlo
+	double* gravlo,
+	double* ptDtemp_,
+	double* ptUtemp_,
+	double* ptAtmep_
     );
 
 	// Print ParaFem to file (ENSI GOLD)
@@ -138,16 +141,16 @@ extern"C"
 	// Calculate Gravitational Loads 
     void gloads_
     (
-		double* gravlo,
-		double* gravity,
-		int*	nn,
-		int*	nodof,
-		const int*	nod,
-		const int*	ndim,
-		int*	nr,
-		double*	g_coord,
-		int*	g_num_pp,
-		int*	rest
+	double* gravlo,
+	double* gravity,
+	int* nn,
+	int* nodof,
+	const int* nod,
+	const int* ndim,
+	int* nr,
+	double*	g_coord,
+	int* g_num_pp,
+	int* rest
     );
 }
 
@@ -172,16 +175,12 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     mPoints_(NULL),
     solidProps_(NULL),
     numSchemes_(NULL),
-    g_num_OF_(NULL), 
     g_num_pp_OF_(NULL),
     g_g_pp_OF_(NULL),
     store_km_pp_OF_(NULL),
     store_mm_pp_OF_(NULL),
     diag_precon_pp_OF_(NULL),
     gravlo_(NULL),
-    d_OF_(NULL),
-    u_OF_(NULL),
-    a_OF_(NULL),
     numRestrNodes_(0),
     rest_(NULL),
     rest_ensi_(NULL),
@@ -193,6 +192,12 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     E_(0),
     nu_(0),
     rhotmp_(0),
+    gCells_(0),
+    gPoints_(0),
+    ptDtemp_(0),
+    ptUtemp_(0),
+    ptAtemp_(0),
+    rbfUpdate_(false),
     D_
     (
         IOobject
@@ -289,6 +294,31 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
+    pointProcAddressing_
+    (
+        IOobject
+        (
+            "pointProcAddressing",
+             mesh.facesInstance(),
+             mesh.meshSubDir,
+             mesh,
+             IOobject::READ_IF_PRESENT,
+             IOobject::NO_WRITE
+        )
+    ),
+    cellProcAddressing_
+    (
+        IOobject
+        (
+            "cellProcAddressing",
+            mesh.facesInstance(),
+            mesh.meshSubDir,
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        )
+    ),
+    of2pfmap_(mesh.points().size()),
     rheology_(sigma_, D_),
     volToPoint_(mesh),
     pointToVol_(pMesh_,mesh),
@@ -306,93 +336,204 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         interface_.set(new TLMaterialInterface(D_, pointD_));
     }
 
+    if (solidProperties().found("rbfUpdate"))
+    {
+        rbfUpdate_ = Switch(solidProperties().lookup("rbfUpdate"));
+    }
+
+    Info << "rbfUpdate: " << rbfUpdate_ << endl;
+
     // - ParaFEM construction 
-    E_ = rheology_.law().E()()[0];
-    nu_ = rheology_.law().nu()()[0];
-    rhotmp_ = rheology_.law().rho()()[0];
+    E_ 		=  rheology_.law().E()()[0];
+    nu_ 	=  rheology_.law().nu()()[0];
+    rhotmp_ 	=  rheology_.law().rho()()[0];
 
     // - Turn on/off the solid mesh Motion
     Switch moveMesh(solidProperties().lookup("moveMesh"));
 
-    label numPoints = mesh.points().size();
-    label numCells = mesh.nCells();
+    
+//------------------------------------------------------------------------------
+//  ParaFEM: Create Steering and Coordinate Matricies
+//------------------------------------------------------------------------------
 
-    mPoints_ = new double[numPoints*ndim];
-
-    // Could Get rid of the restart no real need for if statement here
-    Switch restart(solidProperties().lookup("restart"));
-    if (restart)
+    // Find globalPoints and local Points(note can be done with global MESH)
+    if(Pstream::parRun()==true)
     {
-	pointIOField startPoints
-        (
-            IOobject
-            (
-                "points",
-                runTime().caseConstant(),
-                polyMesh::meshSubDir,
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
-    	label globalIndex = 0;
+	// Global Mesh Points
+	label index 	=  findMax(pointProcAddressing_);
+	gPoints_ 	=  pointProcAddressing_[index];
 
-    	forAll(startPoints, pointI)
-    	{
-	    mPoints_[globalIndex++] = startPoints[pointI].x();
-	    mPoints_[globalIndex++] = startPoints[pointI].y();		
-	    mPoints_[globalIndex++] = startPoints[pointI].z();
-    	}
+	reduce(gPoints_,maxOp<label>());
+
+	gPoints_ 	=  gPoints_ + 1; // Fields Start at 0
+	index 		=  findMax(cellProcAddressing_);
+	gCells_ 	=  cellProcAddressing_[index];
+
+	reduce(gCells_,maxOp<label>());
+
+	gCells_ 	=  gCells_ + 1; // Fields Start at 0
+	mPoints_ 	=  new double[gPoints_*ndim];
     }
     else
     {
-    	label globalIndex = 0;
-    	forAll(mesh.points(), pointI)
-    	{
-	    mPoints_[globalIndex++] = mesh.points()[pointI].x();
-	    mPoints_[globalIndex++] = mesh.points()[pointI].y();		
-	    mPoints_[globalIndex++] = mesh.points()[pointI].z();
-    	}
-     }
+        gPoints_ 	=  mesh.points().size();
+	gCells_ 	=  mesh.nCells();
+	mPoints_ 	=  new double [gPoints_*ndim];
+    }
 
-    g_num_OF_ = new int [numCells*nod];
+
+    // Populate mPoints
+    pointIOField startPoints
+    (
+        IOobject
+        (
+    	    "points",
+             runTime().caseConstant(),
+             polyMesh::meshSubDir,
+             mesh,
+             IOobject::MUST_READ,
+             IOobject::NO_WRITE
+        )
+    );
+    	
     label globalIndex = 0;
+
+    forAll(startPoints, pointI)
+    {
+	mPoints_[globalIndex++]  =  startPoints[pointI].x();
+	mPoints_[globalIndex++]  =  startPoints[pointI].y();		
+	mPoints_[globalIndex++]  =  startPoints[pointI].z();
+    }
+    	
+    // nels_pp
+    const int nels_pp_OF = mesh.nCells();
+    
+    // Set nels_pp
+    setnelspp_(&nels_pp_OF);
+
+    Pout << "nels_pp: " << nels_pp_OF << endl;
+
+    g_num_pp_OF_ = new int [nod*nels_pp_OF]; 
+    ptDtemp_     = new double [ntot*nels_pp_OF];
+    ptUtemp_     = new double [ntot*nels_pp_OF];
+    ptAtemp_     = new double [ntot*nels_pp_OF];
 
     // cellPoints() returns steering array
     const labelListList& cellPoints = mesh.cellPoints();
-    forAll(cellPoints, cellI)
+
+
+    label localIndex = 0;
+ 
+    if(Pstream::parRun()==true)
     {
-        const labelList& curCellPoints = cellPoints[cellI];
-	
-	if (curCellPoints.size() != nod)
+	forAll(cellPoints, cellI)
 	{
-            Info << "Not a hex cell!" << endl;
+	    const labelList& curCellPoints = cellPoints[cellI]; 
+
+	    if (curCellPoints.size() != nod)
+	    {
+		Info << "Not a hex cell!" << endl;
+	    }
+
+	    for(label i=0;i<nod;i++)
+	    {
+		g_num_pp_OF_[localIndex++] = pointProcAddressing_[curCellPoints[i]]+1; // +1 fortran
+	    }	 
 	}
-
-	for(label i=0;i<nod;i++)
-	{
-	    g_num_OF_[globalIndex++] = curCellPoints[i]+1; // +1 fortran
-	}	 
     }
-
-// ------------- RESTRAINED ARRAYS ------------- //
-// Create RESTRAINED array (0=Restrained 1=Unrestrained)
-// (ENSI GOLD format is reversed)
-
-
-    label nRows = mesh.points().size();
-    rest_ensi_ = new int [nRows*4];
-    fortranRest rest_ensi_obj(nRows);
-
-    for (label i=0; i<numPoints; i++)
+    else
     {
-	rest_ensi_obj.addNode(i,0,0,0);
-    }
+        forAll(cellPoints, cellI)
+        {
+            const labelList& curCellPoints = cellPoints[cellI];
+            
+ 	    if (curCellPoints.size() != nod)
+            {
+                Info << "Not a hex cell!" << endl;
+            }
 
+            for(label i=0;i<nod;i++)
+            {
+                g_num_pp_OF_[localIndex++] = curCellPoints[i]+1; // +1 fortran
+            }
+    	}
+     }
+
+
+//------------------------------------------------------------------------------
+//  ParaFEM: Create Restrained Arrays
+//------------------------------------------------------------------------------
+// paraFem	:  0=Restrained 1=Unrestrained
+// ensi_gold	:  1=Restrained 0=Unrestrained
+
+    numRestrNodes_  =  0;
+    // First Time Get size
+    forAll(pointD_.boundaryField(), patchI)
+    {
+        if 
+        (
+            isA<fixedValuePointPatchVectorField>
+            (
+                pointD_.boundaryField()[patchI]
+            )
+        )
+        {
+	    numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
+	}
+        
+        if 
+	(
+            (mesh.boundary()[patchI].type() == "empty") || 
+	    (mesh.boundary()[patchI].type() == "symmetryPlane")
+	)
+	{
+	    numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
+	}	
+    }
+ 
+    // Declare local Restrained List    
+    labelListList localRest(numRestrNodes_);
+
+    // Second Time populate
+
+//------------------------------------------------------------------------------
+//  ParaFEM: Boundary Conditions 
+//------------------------------------------------------------------------------
 
     forAll(pointD_.boundaryField(), patchI)
     {
- 	//- Restrain the fixedValue pointD fields
+
+	// ------ Fixed Z ------
+	if 
+	(
+            (mesh.boundary()[patchI].type() == "empty")
+	)
+	{
+	    const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
+
+	    forAll(mp, pI)
+	    {
+  	        labelList myList(4);
+		if(Pstream::parRun()==true)
+    		{
+		    myList[0]  =  pointProcAddressing_[mp[pI]]+1;
+		}
+		else
+		{
+		    myList[0]  =  mp[pI]+1;
+		}
+		if (localRest[mp[pI]].size() == 0)
+		{	
+		    myList[1]  =  1;
+		    myList[2]  =  1;
+		    myList[3]  =  0;
+	            localRest[mp[pI]] =  myList;
+		}
+	    }  
+	}
+
+
+        // ------ Fixed X Y Z ------
         if 
         (
             isA<fixedValuePointPatchVectorField>
@@ -405,146 +546,162 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 
 	    forAll(mp, pI)
 	    {
-                label i = mp[pI];
-		rest_ensi_obj.editNode(i,1,1,1);		
-	    }
-	}
-	
-	if 
-	(
-            (mesh.boundary()[patchI].type() == "empty") || 
-	    (mesh.boundary()[patchI].type() == "symmetryPlane")
-	)
-
-	{
-            //numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
-	    const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
-
-	    // empty implies symmetry in Z
-	    int x=0;
-	    int y=0;
-	    int z=0;
-	    
-            // symmetry boundaries must have these names
-	    if (mesh.boundaryMesh()[patchI].name() == "symmetry-x")
-	    {
-	        x=1;
-		y=2;
-   		z=2;
-	    }
-	    else if (mesh.boundaryMesh()[patchI].name() == "symmetry-y")
-	    {
-	        x=2;
-		y=1;
-   		z=2;
-	    }
-	    else if (mesh.boundaryMesh()[patchI].type() == "empty")
-	    {
-	        x=2;
-		y=2;
-   		z=1;
-	    }
-
-	    forAll(mp, pI)
-	    {
-		// WARNING CURRENTLY SET UP FOR FIXED Z
-		label i = mp[pI];
-		rest_ensi_obj.editNode(i,x,y,z);
-	    }
+  	        labelList myList(4);
+		if(Pstream::parRun()==true)
+    		{
+		    myList[0]  =  pointProcAddressing_[mp[pI]]+1;
+		}
+		else
+		{
+		    myList[0]  =  mp[pI]+1;
+		}
+	        myList[1]  =  0;
+	        myList[2]  =  0;
+	        myList[3]  =  0;
+                localRest[mp[pI]] =  myList;
+	    }	
 	}
     }
 
-    rest_ensi_obj.printENSI(rest_ensi_);
-    numRestrNodes_ = rest_ensi_obj.getNumRestNodes();
-    rest_ = new int [numRestrNodes_*4];
-    rest_ensi_obj.printFromENSI(rest_, numRestrNodes_);
+//------------------------------------------------------------------------------
+//  ParaFEM: gnereating Restrained Array 
+//------------------------------------------------------------------------------
 
-// ------------- DECLARE ARRAYS ------------- //
-    int size_ = Pstream::nProcs();
-    calcnelsppof_(&numCells,&size_);
-    const int nels_pp_OF = findnelspp_();
+    // Resize Lists
+    label resize = 0;
+    forAll(localRest,listI)
+    {
+	if(localRest[listI].size() !=0)
+	{
+	    resize++;
+	}
+    }
+
+    localRest.resize(resize);
+    numRestrNodes_ = localRest.size();
+
+    // Gather All Lists
+    List<List<List<label>>> globalRest(Pstream::nProcs(), localRest);
     
-    g_num_pp_OF_ = new int [nod*nels_pp_OF];
-    g_g_pp_OF_ = new int [ntot*nels_pp_OF];
-    store_km_pp_OF_ = new double [ntot*ntot*nels_pp_OF];
-    store_mm_pp_OF_ = new double [ntot*ntot*nels_pp_OF];
+    globalRest[Pstream::myProcNo()] = localRest;
 
-// ------------- SOLID SOLUTION PROPERTIES ------------- //
+    Pstream::gatherList(globalRest);
+    Pstream::scatterList(globalRest);  
+
+    // Create master Rest;
+    reduce(numRestrNodes_,sumOp<double>());
+    labelListList masterRest (numRestrNodes_);
+
+    label restIndex = 0;
+    forAll(globalRest,procI)
+    {
+	forAll(globalRest[procI],listI)
+	{
+	    masterRest[restIndex]=globalRest[procI][listI];
+	    restIndex++;
+	}
+    }
+
+    //Sort and find duplicate nodes
+    sort(masterRest);
+
+    labelList duplicateNodes;
+
+    duplicateOrder(masterRest,duplicateNodes);   
+
+    // Copy Restrained labelList into rest_
+    numRestrNodes_ = numRestrNodes_ - duplicateNodes.size();
+    rest_ = new int [numRestrNodes_*4];
+    restIndex = 0;
+
+    forAll(masterRest,listI)
+    {
+	if (listI != 0 && masterRest[listI][0] == masterRest[listI-1][0])
+        {
+	     continue;
+	}
+	else
+	{
+	    rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
+            rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
+            rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
+            rest_[ numRestrNodes_* 3 + restIndex ] =  masterRest[listI][3];
+	    restIndex++;	
+	}
+    }
+
+//------------------------------------------------------------------------------
+//  ParaFEM: Create Arrays for intialisation
+//------------------------------------------------------------------------------
+
+    g_g_pp_OF_ 	    =  new int [ntot*nels_pp_OF];
+    store_km_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
+    store_mm_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
+
     double alpha1 (readScalar(solidProperties().lookup("alpha1")));
     double beta1 (readScalar(solidProperties().lookup("beta1")));
     double timestep (readScalar(solidProperties().lookup("timeStep")));
     double theta (readScalar(solidProperties().lookup("theta")));
     
-    numSchemes_ = new double[4];
-    numSchemes_[0] = alpha1;
-    numSchemes_[1] = beta1;
-    numSchemes_[2] = theta;
-    numSchemes_[3] = timestep;
+    numSchemes_ 	=  new double[4];
+    numSchemes_[0] 	=  alpha1;
+    numSchemes_[1] 	=  beta1;
+    numSchemes_[2] 	=  theta;
+    numSchemes_[3] 	=  timestep;
 
-// ------------- SOLID RHEOLOGY PROPERTIES ------------- //
-    solidProps_ = new double[3];
-    solidProps_[0] = E_;
-    solidProps_[1] = nu_;
-    solidProps_[2] = rhotmp_;
-
-//    if((Pstream::master()==true) or (Pstream::parRun()==false))
-//    {
-//        checkparafem_
-//        (
-//            mPoints_, 
-//            g_num_OF_, 
-//            rest_ensi_, 
-//            &numPoints, 
-//            &numCells
-//        );
-//    }
-//    std::clock_t start;
-//    double initFEM = 0.0;
-//    start = std::clock();
-
+    solidProps_ 	=  new double[3];
+    solidProps_[0] 	=  E_;
+    solidProps_[1] 	=  nu_;
+    solidProps_[2] 	=  rhotmp_;
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
+
+//------------------------------------------------------------------------------
+//  ParaFEM: Initialise ParaFEM
+//------------------------------------------------------------------------------
+
     initparafem_
     (
         mPoints_,
-        g_num_OF_,
+        g_num_pp_OF_,
         rest_,
-        &numPoints,
-        &numCells,
+        &gPoints_,
+        &gCells_,
         &numRestrNodes_,
         solidProps_,
         g_g_pp_OF_,
         store_km_pp_OF_,
-	store_mm_pp_OF_,
-	g_num_pp_OF_
+	store_mm_pp_OF_
     );
+
     reduce(tmp,sumOp<label>());
 
-//    initFEM =  (std::clock()-start)/(double) CLOCKS_PER_SEC;
-//    Info << "initFEM: " << initFEM << endl;
-
+    // Must follow initparafem
     const int neq_pp_OF = findneqpp_();
     diag_precon_pp_OF_ = new double [neq_pp_OF];
     
-    double gravity(readScalar(solidProperties().lookup("gravity")));
 
+//------------------------------------------------------------------------------
+//  ParaFEM: Find Gravitry loading if set in dictionary
+//------------------------------------------------------------------------------
+
+    double gravity(readScalar(solidProperties().lookup("gravity")));
     gravlo_ = new double [neq_pp_OF];
 
     if(gravity > 1e-6)
     { 
-	    Info << "Gravity Loading, gravity: " << gravity << " m/s^2" << endl; 
+	Info << "Gravity Loading, gravity: " << gravity << " m/s^2" << endl; 
 
+	// Specific weight lambda = rho * g (gloads: negative y implied)
+	double specWeight=gravity*rhotmp_;;
+	int nodof=3;	    
 
-	    // Specific weight lambda = rho * g (gloads: direction of negative y implied)
-	    double specWeight=gravity*rhotmp_;;
-	    int nodof=3;	    
-
-	    gloads_ 
-	    (
+	gloads_ 
+	(
 	    gravlo_,
 	    &specWeight,
-	    &numPoints,
+	    &gPoints_,
 	    &nodof,
 	    &nod,
 	    &ndim,
@@ -552,7 +709,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 	    mPoints_,
 	    g_num_pp_OF_,
 	    rest_
-	    );
+	);
     }
     else
     {
@@ -562,9 +719,17 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
  	}
     }
     
+
+//------------------------------------------------------------------------------
+//  ParaFEM: Find Diagonal Preconditioner
+//------------------------------------------------------------------------------
+
     finddiagparafem_(store_km_pp_OF_,store_mm_pp_OF_,numSchemes_,diag_precon_pp_OF_);
 
-// ------------- CALCULATING FORCE ARRAYS ------------- //
+//------------------------------------------------------------------------------
+//  ParaFEM: Create Force Arrays
+//------------------------------------------------------------------------------
+
     // Identify traction specified points
     forAll(D_.boundaryField(), patchI)
     {
@@ -577,14 +742,13 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         )
         {
             numFixedForceNodes_ += 
-                mesh.boundaryMesh()[patchI].meshPoints().size();
+				mesh.boundaryMesh()[patchI].meshPoints().size();
         }
     }
 
-    forceNodes_ = new int [numFixedForceNodes_*ndim];
-    fext_OF_ = new double [numFixedForceNodes_*ndim];
-    nodeensi_ = new int [numFixedForceNodes_*ndim];
-    sense_ = new int [numFixedForceNodes_*ndim];
+
+    forceNodes_   =  new int [numFixedForceNodes_*ndim];
+    fext_OF_ 	  =  new double [numFixedForceNodes_*ndim];
 
     label gi = 0;
     forAll(D_.boundaryField(), patchI)
@@ -597,67 +761,112 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
             )
         )
         {
+  	    // Local Point
 	    const labelList& mp = 
                 mesh.boundaryMesh()[patchI].meshPoints();
 
-	    jj_=0;
-	    forAll(mp, pI)
-            {	      
-                forceNodes_[gi++] = mp[pI]+1;
-                nodeensi_[jj_] = mp[pI];
-                nodeensi_[jj_+1] = mp[pI];
-                nodeensi_[jj_+2] = mp[pI];
-        	sense_[jj_]=1;
-	        sense_[jj_+1]=2;
-	        sense_[jj_+2]=3;
- 		jj_=jj_+3;
+            if (Pstream::parRun())
+            {
+	    	jj_=0;
+	    	forAll(mp, pI)
+            	{			  
+		    // Global Point
+		    label myP = pointProcAddressing_[mp[pI]];
+	 	    forceNodes_[gi++] = myP+1;
+		    jj_=jj_+3;
+	    	}
 	    }
-        }
-    }
+	    else
+	    {
+	    	jj_=0;
+	    	forAll(mp, pI)
+                {	
+		    forceNodes_[gi++] = mp[pI]+1;
+ 		    jj_=jj_+3;
+	        }		
+	    }
+    	} // if
+    } // forAll
+
 
     // Set force to zero
     for(int i=0; i<numFixedForceNodes_*ndim; i++)
     {
  	fext_OF_[i]=0;
-    }	
-
-    d_OF_ = new double [numPoints*ndim];
-    u_OF_ = new double [numPoints*ndim];
-    a_OF_ = new double [numPoints*ndim];
-
-    // Set dispField to zero
-    for(int i=0; i<numPoints*ndim; i++)
-    {
-        d_OF_[i]=0;
-        u_OF_[i]=0;
-        a_OF_[i]=0;
     }
 
-    delete[] g_num_OF_;
+//------------------------------------------------------------------------------
+//  ParaFEM: Create Map from OpenFOAM local to ParaFEM 
+//------------------------------------------------------------------------------
+
+    vectorField& pointDI = pointD_.internalField();
+
+    forAll(pointDI, pointI)
+	{
+	    label value=0;
+
+	    if(Pstream::parRun()==true)
+    	    {
+	        value  =  pointProcAddressing_[pointI]+1;
+	    }
+	    else
+ 	    {
+		value  =  pointI+1;
+	    }
+
+	    label index  =  0;
+	    label iel    =  0;  
+
+	    label resizeval=0;
+	    label counter=0;
+
+	    // nod represnets the max number of elements a node may hold
+	    labelList myLabel (nod,0);
+
+	    // for each value find position in steering matrix
+	    for(int i=0; i<nels_pp_OF*nod;i++)
+	    {
+		if(i % nod == 0 && i!=0)
+		{
+		    iel++;
+		    index=0;
+		}
+
+		if(value==g_num_pp_OF_[i])		
+		{ 
+		    resizeval++;
+		    myLabel[counter]=(iel*ntot)+(index*ndim);
+		    counter++;
+		}
+
+			index++;
+	    }	// end for loop	
+	    myLabel.resize(resizeval);
+	    of2pfmap_[pointI] = myLabel;
+
+	} // end for all
+
     delete[] mPoints_;
     delete[] rest_ensi_;
     delete[] rest_;
     delete[] nodeensi_;
     delete[] sense_;
 
-}
+} // End Constructor
+
 
 DyParaFEMSolid::~DyParaFEMSolid()
 {
     delete[] store_km_pp_OF_;
     delete[] store_mm_pp_OF_;
     delete[] diag_precon_pp_OF_;
-    delete[] d_OF_;
-    delete[] u_OF_;
-    delete[] a_OF_;
     delete[] rest_;
     delete[] solidProps_;
     delete[] mPoints_;
-    delete[] g_num_OF_;
+    delete[] g_num_pp_OF_;
     delete[] g_g_pp_OF_;
     delete[] rest_ensi_;
     delete[] numSchemes_;
-    delete[] g_num_pp_OF_;
     delete[] forceNodes_;
     delete[] fext_OF_;
     delete[] nodeensi_;
@@ -666,9 +875,6 @@ DyParaFEMSolid::~DyParaFEMSolid()
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-
 
 vector DyParaFEMSolid::pointU(label pointID) const
 {
@@ -705,6 +911,7 @@ tmp<vectorField> DyParaFEMSolid::patchPointDisplacementIncrement
             vector::zero
         )
     );
+
 
     tPointDisplacement() = 
         vectorField
@@ -744,7 +951,7 @@ tmp<vectorField> DyParaFEMSolid::faceZonePointDisplacementIncrement
     if (globalZoneIndex != -1)
 //    if (false)
     {
-	Info << "WARNING FIELDS ARE STORED ON EVERY PROCESSOR" << endl;
+	//Info << "WARNING FIELDS ARE STORED ON EVERY PROCESSOR" << endl;
         // global face zone
 
         const labelList& curPointMap =
@@ -1514,89 +1721,96 @@ bool DyParaFEMSolid::evolve()
 {
     Info << "Evolving solid solver: " 
         << DyParaFEMSolid::typeName << endl;
-
-    label numPoints = mesh().points().size();
+    
+    label lPoints = mesh().points().size();
     double time = mesh().time().value();
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
 
+    // Interpolating Face to Point Forces
     #include "updateForce.H"
-
+ 
     vectorField& oldPointDI = pointD_.oldTime().internalField();
     vectorField& oldPointUI = pointU_.oldTime().internalField();
     vectorField& oldPointAI = pointA_.oldTime().internalField();
 
+    // Copy data OF-PF
     forAll(oldPointDI, pointI)
     {
-	 d_OF_[pointI*ndim + 0]=oldPointDI[pointI].x();
-	 d_OF_[pointI*ndim + 1]=oldPointDI[pointI].y();
-	 d_OF_[pointI*ndim + 2]=oldPointDI[pointI].z();
+	
+	forAll(of2pfmap_[pointI],value)
+	{
+	    ptDtemp_[of2pfmap_[pointI][value] + 0]  =  oldPointDI[pointI].x();
+	    ptDtemp_[of2pfmap_[pointI][value] + 1]  =  oldPointDI[pointI].y();
+	    ptDtemp_[of2pfmap_[pointI][value] + 2]  =  oldPointDI[pointI].z();
 
-	 u_OF_[pointI*ndim + 0]=oldPointUI[pointI].x();
-	 u_OF_[pointI*ndim + 1]=oldPointUI[pointI].y();
-	 u_OF_[pointI*ndim + 2]=oldPointUI[pointI].z();
+	    ptUtemp_[of2pfmap_[pointI][value] + 0]  =  oldPointUI[pointI].x();
+	    ptUtemp_[of2pfmap_[pointI][value] + 1]  =  oldPointUI[pointI].y();
+	    ptUtemp_[of2pfmap_[pointI][value] + 2]  =  oldPointUI[pointI].z();
 
-	 a_OF_[pointI*ndim + 0]=oldPointAI[pointI].x();
-	 a_OF_[pointI*ndim + 1]=oldPointAI[pointI].y();
-	 a_OF_[pointI*ndim + 2]=oldPointAI[pointI].z();
-     } 
+	    ptAtemp_[of2pfmap_[pointI][value] + 0]  =  oldPointAI[pointI].x();
+	    ptAtemp_[of2pfmap_[pointI][value] + 1]  =  oldPointAI[pointI].y();
+	    ptAtemp_[of2pfmap_[pointI][value] + 2]  =  oldPointAI[pointI].z(); 
+	}
+	
+    }
 
-//    checkforce_
-//    (
-//        fext_OF_,
-//        sense_, 
-//        nodeensi_,
-//        &numFixedForceNodes_,
-//        &numPoints
-//    );
 
-    // Inputs to Parafem
+//------------------------------------------------------------------------------
+//  ParaFEM: Run ParaFEM Code
+//------------------------------------------------------------------------------
     runparafem_
     (
 	numSchemes_,
         fext_OF_,
         forceNodes_,
         &numFixedForceNodes_,
-        d_OF_,
-		u_OF_,
-		a_OF_,
-		&time,	
-        &numPoints,
+	&time,	
+        &lPoints,
         g_g_pp_OF_,
         g_num_pp_OF_,
         store_km_pp_OF_,
-		store_mm_pp_OF_,
+	store_mm_pp_OF_,
         diag_precon_pp_OF_,
-		gravlo_
+	gravlo_,
+	ptDtemp_,
+	ptUtemp_,
+	ptAtemp_
     );
 
-   // ParaFEM Outputs from both processors the full
-   // ptD, ptU and ptA arrays
+
     vectorField& pointDI = pointD_.internalField();
     vectorField& pointUI = pointU_.internalField();
     vectorField& pointAI = pointA_.internalField();
 
-    // EDIT
-    // Change to memcpy or std::copy()
+    // Copy data PF-OF
     forAll(pointDI, pointI)
     {
-	 pointDI[pointI].x() = d_OF_[pointI*ndim + 0];
-	 pointDI[pointI].y() = d_OF_[pointI*ndim + 1];
-	 pointDI[pointI].z() = d_OF_[pointI*ndim + 2];
+        pointDI[pointI].x() = ptDtemp_[of2pfmap_[pointI][0] + 0];
+        pointDI[pointI].y() = ptDtemp_[of2pfmap_[pointI][0] + 1];
+        pointDI[pointI].z() = ptDtemp_[of2pfmap_[pointI][0] + 2];
 
-	 pointUI[pointI].x() = u_OF_[pointI*ndim + 0];
-	 pointUI[pointI].y() = u_OF_[pointI*ndim + 1];
-	 pointUI[pointI].z() = u_OF_[pointI*ndim + 2];
+        pointUI[pointI].x() = ptUtemp_[of2pfmap_[pointI][0] + 0];
+        pointUI[pointI].y() = ptUtemp_[of2pfmap_[pointI][0] + 1];
+        pointUI[pointI].z() = ptUtemp_[of2pfmap_[pointI][0] + 2];
 
-	 pointAI[pointI].x() = a_OF_[pointI*ndim + 0];
-	 pointAI[pointI].y() = a_OF_[pointI*ndim + 1];
-	 pointAI[pointI].z() = a_OF_[pointI*ndim + 2];
+        pointAI[pointI].x() = ptAtemp_[of2pfmap_[pointI][0] + 0];
+        pointAI[pointI].y() = ptAtemp_[of2pfmap_[pointI][0] + 1];
+        pointAI[pointI].z() = ptAtemp_[of2pfmap_[pointI][0] + 2];
+    }
+    
+
+    // Calculate Cauchy Green Stress Tensor
+    {
+	D_ = pointToVol_.interpolate(pointD_);
+        epsilon_ = symm(fvc::grad(D_));
+
+        sigma_ = 2*mu_*epsilon_ + I*(lambda_*tr(epsilon_));
     }
 
-    D_ = pointToVol_.interpolate(pointD_);
-//    U_ = pointToVol_.interpolate(pointU_); 
-//    A_ = pointToVol_.interpolate(pointA_);
+    //    U_ = pointToVol_.interpolate(pointU_); 
+    //    A_ = pointToVol_.interpolate(pointA_);
     return true;
 }
 
@@ -1621,17 +1835,16 @@ void DyParaFEMSolid::predict()
 
 void DyParaFEMSolid::updateFields()
 {
-
     Info << "updateFields:" << endl;
-    //volToPoint_.interpolate(D_, pointD_);
 
     rho_ = rheology_.rho();
-//    mu_ = rheology_.mu();
-//    lambda_ = rheology_.lambda();
+    mu_ = rheology_.mu();
+    lambda_ = rheology_.lambda();
 }
 
 tmp<surfaceVectorField> DyParaFEMSolid::traction() const
 {
+    Info << "traction:" << endl;
     tmp<surfaceVectorField> tTraction
     (
         new surfaceVectorField
@@ -1660,6 +1873,7 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
 //            solidProperties().lookup("nonLinear")
 //        );
 //     Switch nonLinear(solidProperties().lookup("nonLinear"));
+
 
     if (moveMesh)
     {
@@ -1698,9 +1912,10 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
 
         forAll (pointDI, pointI)
         {
-           // curPoints[pointI] += pointDI[pointI];
-	    curPoints[pointI]=startPoints[pointI]+pointDI[pointI];
+            curPoints[pointI] += pointDI[pointI];
+	   // curPoints[pointI]=startPoints[pointI]+pointDI[pointI];
         }
+
 
         // Unused points (procedure developed by Philip Cardiff, UCD) 
         forAll(globalFaceZones(), zoneI)
@@ -1745,6 +1960,7 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
                 //- now average the displacement between all procs
                 curGlobalZonePointDispl /= pointNumProcs;
             }
+
 
             //- The curZonePointsDisplGlobal now contains the correct 
             //  face zone displacement in a global master processor order, 

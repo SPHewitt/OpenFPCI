@@ -1,24 +1,6 @@
-// Date (21 April 2016)
-// Not Updated RBF YET
-// Altered primitive patch interpolation
-// forces were being read into paraFEM wrong
-// see /home/mclsssh5/code-backup/src:16-04-21 for old version
-// New Algorithm
-// Convert face Traction to face Force
-// Interpolate Face Force to point forces **
-// ** Note this isnt the same as Page 610 in Programming the FEM
-// WARNING Interpolation from face to Point isnt fully conservative
+// Date (1st August 2017)
 
-
-// Syncronise Statement to ensure all processors are at this point
-//Pout << "BEFOREProcessor: " << Pstream::myProcNo() << endl;
-
-//Pout << "AFTER Processor: " << Pstream::myProcNo() << endl;
-
-Switch RBF(solidProperties().lookup("rbf"));
-//bool RBF = false;
-
-if (RBF)
+if (rbfUpdate_)
 {
     Info << "Update force using rbf interpolation" << endl;
 
@@ -115,7 +97,7 @@ if (RBF)
                     );
 	    }
 
-	    Info << "Total Point Force: " << sum(pTraction) << endl;
+	    Info << "Total Point Force: " << gSum(pTraction) << endl;
             
 	   // Info << "Absolute Error" << sum(pTraction)-sum(fForce) << endl;
  
@@ -135,6 +117,7 @@ if (RBF)
 else
 {
     Info << "Update force using primitive patch interpolation" << endl;
+
 
     label gi = 0;
     forAll(D_.boundaryField(), patchI)
@@ -158,47 +141,41 @@ else
 	    vectorField fTraction = patchD.traction();
 	    vectorField fForce(patchD.size(),vector::zero);
 
-
  	    // Create Face forces from Face tractions and face Areas 
             forAll(patchD,faceI)
                 {
                     fForce[faceI] = fTraction[faceI];
 		    fForce[faceI] *= magSf.boundaryField()[patchI][faceI];
-                }
 
-	    Info << "Total Face Force = " << sum(fForce) << endl;
+               }	
 
 	    primitivePatchInterpolation patchInterpolator
             (
                 mesh().boundaryMesh()[patchI]
-            );
-
-//	    vectorField pTraction =
-//	        patchInterpolator.faceToPointInterpolate
-//	        (
-//                    patchD.traction()
-//	        );
+            );	
 
 	    vectorField pForce =
-	        patchInterpolator.faceToPointInterpolate
-	        (
-                    fForce
+		patchInterpolator.faceToPointInterpolate
+		(
+		    fForce
 	        );
 
-	    Info << "Total Point Force = " << sum(pForce) << endl;
-//	    Info << "Absolute Error" << sum(pForce) - sum(fForce) << endl;
-            forAll(pForce, pointI)
-            {	
-                fext_OF_[gi*ndim+0] = pForce[pointI].x();
-               	fext_OF_[gi*ndim+1] = pForce[pointI].y();
-                fext_OF_[gi*ndim+2] = pForce[pointI].z();
-		gi++;
 
-	    }
+	    Info << "Total Point Force: " << gSum(pForce) << endl;
+	    	
+	    gi = 0;
+            forAll(pForce,pointI)
+            {
+            	fext_OF_[gi*ndim+0] = pForce[pointI].x();
+      	    	fext_OF_[gi*ndim+1] = pForce[pointI].y();
+            	fext_OF_[gi*ndim+2] = pForce[pointI].z();
+	    	gi++;
+            }
+	    
 
-        }  // End If
+        }  // End If (if PAtch = forcePAtch)
 
-    }  // End forAll
+    }  // End forAll (forAll Patches)
 
-}  // End Else
+}  // End Else (rbf vs PrimPatch)
 

@@ -47,7 +47,6 @@ SourceFiles
 #include "leastSquaresVolPointInterpolation.H"
 #include "pointVolInterpolation.H"
 #include "TLMaterialInterface.H"
-#include "primitivePatchInterpolation.H"
 #include "fortranRest.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -76,13 +75,10 @@ class DyParaFEMSolid
         //- An array for the Numerical Schemes
         double* numSchemes_;
 
-        //-
-        int* g_num_OF_;
-
-        //-
+        //- Steering matrix
         int* g_num_pp_OF_;
 
-        //-
+        //- Global neq matrix
         int*  g_g_pp_OF_; 
 
         //-
@@ -94,37 +90,28 @@ class DyParaFEMSolid
         //- Mass Matrix per processor
         double*  store_mm_pp_OF_;
 
-        //-
+        //- Diagonal Preconditioner
         double*  diag_precon_pp_OF_;
 
-	//-
+	//- bodyForce
 	double* gravlo_;
-
-        //-
-        double* d_OF_;
-
-        //-
-        double* u_OF_;
-
-        //-
-        double* a_OF_;
 
         //- Number of restrained nodes
         int numRestrNodes_;
 
-        //-
+        //- restrained array
         int* rest_;
 
-        //-
+        //- restrained array ensi gold
         int* rest_ensi_;
 
         //- Number of force specified nodes
         int numFixedForceNodes_;
 
-        //- 
+        //- Node numbers for interface
         int* forceNodes_;
 
-        //-
+        //- Force val at interface
         double* fext_OF_;
 
         //-
@@ -133,14 +120,32 @@ class DyParaFEMSolid
         //-
         int* sense_;
 
-        //-
+        //- Youngs Modulus
         double E_;
 
-        //-
+        //- Poissons ratio
         double nu_;
 
-        //-
+        //- temporary Density
         double rhotmp_;
+
+        //- Total Cells
+        int gCells_;
+
+        //- Total Points
+        int gPoints_;
+
+	//- Displacement Field PF format
+	double* ptDtemp_;
+
+	//- Velocity Field PF format
+        double* ptUtemp_;
+
+        //- Acceleration Field PF format
+        double* ptAtemp_;
+
+        //- Use rbf interpolation
+        Switch rbfUpdate_;
 
         //- Displacement field
         volVectorField D_;
@@ -166,6 +171,15 @@ class DyParaFEMSolid
         //- Strain field
         volSymmTensorField epsilon_;
 
+        //- Point Processor Addressing 
+        labelIOList pointProcAddressing_;
+
+        //- Cell Processor Addressing
+        labelIOList cellProcAddressing_;
+
+        //- An array for global to Local point Map (evolve Solid)
+        labelListList of2pfmap_;
+	
         //- Rheology model
         constitutiveModel rheology_;
 
