@@ -38,6 +38,8 @@ License
 #include <ctime>
 #include <iostream>
 #include <fstream>
+#include <time.h>
+#include <ctime>
 
 using namespace rbf;
 
@@ -49,40 +51,51 @@ const int ntot=ndim*nod; // ntot
 
 using namespace std;
 
+
+// Declaration of Fortran Subroutines 
 extern"C"
 {
+
+    // Initialises ParaFEM
+    // Called at construction
     void initparafem_
     (
-        double* g_coord,
+        double* g_coord,	
         int* g_num,
         int* rest,
         int* nn, 
         const int* nels,
         const int* nr,
-	double* SolidProperties,
+		double* SolidProperties,
         int* g_g_pp,
-	double* stiff,
-	double* mass,
-	int* g_num_pp
+		double* stiff,
+		double* mass,
+		int* g_num_pp
     );
 
+    // return number of equations/proc 
     int findneqpp_();
+
+    // return number of cells/proc
     int findnelspp_();
 
+    // Calculate number of cells/proc
     int calcnelsppof_
     (
 	int* numElements,
 	int* numProcessors
     );
 
+    // Find the Diagonal preconditioner
     void finddiagparafem_
     (
         double* stiff,
-	double* mass,
-	double* NumericalVariables,
+		double* mass,
+		double* NumericalVariables,
         double* precon
     );
 
+    // Print out the Force to Ensignt Format
     void checkforce_
     (
         double* force,
@@ -92,25 +105,27 @@ extern"C"
         int* solidMeshSize
     );
 
+    // Solve the structural equation
     void runparafem_
     (
-	double* NumericalVariables,
+		double* NumericalVariables,
         double* f_ext, 
         int* f_node,
         int* solidPatchIDSize,
-	double* paraFemSolidDisp,
-	double* paraFemSolidVel,
-	double* paraFemSolidAcel,
-	double* time,
+		double* paraFemSolidDisp,
+		double* paraFemSolidVel,
+		double* paraFemSolidAcel,
+		double* time,
         int* nn,
         int* g_g_pp,
         int* g_num_pp,
-	double* stiff,
-	double* mass,
+		double* stiff,
+		double* mass,
         double* precon,
-	double* gravlo
+		double* gravlo
     );
 
+	// Print ParaFem to file (ENSI GOLD)
     void checkparafem_
     (
         double* mesh,
@@ -120,18 +135,19 @@ extern"C"
         int* nels
     );
 
+	// Calculate Gravitational Loads 
     void gloads_
     (
-	double* gravlo,
-	double* gravity,
-	int*	nn,
-	int*	nodof,
-	const int*	nod,
-	const int*	ndim,
-	int*	nr,
-	double*	g_coord,
-	int*	g_num_pp,
-	int*	rest
+		double* gravlo,
+		double* gravity,
+		int*	nn,
+		int*	nodof,
+		const int*	nod,
+		const int*	ndim,
+		int*	nr,
+		double*	g_coord,
+		int*	g_num_pp,
+		int*	rest
     );
 }
 
@@ -226,12 +242,12 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
             "pointU",
             runTime().timeName(),
             mesh,
-            IOobject::READ_IF_PRESENT,
-            //IOobject::MUST_READ,
+            //IOobject::READ_IF_PRESENT,
+            IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        pMesh_,
-	dimensionedVector("0", dimVelocity, vector::zero)
+        pMesh_
+	//dimensionedVector("0", dimVelocity, vector::zero)
     ),
     pointA_
     (
@@ -240,12 +256,12 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
             "pointA",
             runTime().timeName(),
             mesh,
-            IOobject::READ_IF_PRESENT,
-            //IOobject::MUST_READ,
+            //IOobject::READ_IF_PRESENT,
+            IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        pMesh_,
-	dimensionedVector("0", dimAcceleration, vector::zero)
+        pMesh_
+	//dimensionedVector("0", dimAcceleration, vector::zero)
     ),
     sigma_
     (
@@ -282,6 +298,8 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     interface_(NULL)
 {
     pointD_.oldTime();
+    pointU_.oldTime();
+    pointA_.oldTime();
 
     if (rheology_.law().type() == multiMaterial::typeName)
     {
@@ -299,19 +317,48 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     label numPoints = mesh.points().size();
     label numCells = mesh.nCells();
 
-    mPoints_ = new double[numPoints*ndim]; 
-    
-    label globalIndex = 0;
-    forAll(mesh.points(), pointI)
+    mPoints_ = new double[numPoints*ndim];
+
+    // Could Get rid of the restart no real need for if statement here
+    Switch restart(solidProperties().lookup("restart"));
+    if (restart)
     {
-	mPoints_[globalIndex++] = mesh.points()[pointI].x();
-	mPoints_[globalIndex++] = mesh.points()[pointI].y();		
-	mPoints_[globalIndex++] = mesh.points()[pointI].z();
+	pointIOField startPoints
+        (
+            IOobject
+            (
+                "points",
+                runTime().caseConstant(),
+                polyMesh::meshSubDir,
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+    	label globalIndex = 0;
+
+    	forAll(startPoints, pointI)
+    	{
+	    mPoints_[globalIndex++] = startPoints[pointI].x();
+	    mPoints_[globalIndex++] = startPoints[pointI].y();		
+	    mPoints_[globalIndex++] = startPoints[pointI].z();
+    	}
     }
+    else
+    {
+    	label globalIndex = 0;
+    	forAll(mesh.points(), pointI)
+    	{
+	    mPoints_[globalIndex++] = mesh.points()[pointI].x();
+	    mPoints_[globalIndex++] = mesh.points()[pointI].y();		
+	    mPoints_[globalIndex++] = mesh.points()[pointI].z();
+    	}
+     }
 
     g_num_OF_ = new int [numCells*nod];
-   
-    globalIndex = 0;
+    label globalIndex = 0;
+
+    // cellPoints() returns steering array
     const labelListList& cellPoints = mesh.cellPoints();
     forAll(cellPoints, cellI)
     {
@@ -373,7 +420,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
             //numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
 	    const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
 
-	    // empty basically implies symmetry in Z
+	    // empty implies symmetry in Z
 	    int x=0;
 	    int y=0;
 	    int z=0;
@@ -455,6 +502,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 //    double initFEM = 0.0;
 //    start = std::clock();
 
+
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
     initparafem_
@@ -480,12 +528,13 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     diag_precon_pp_OF_ = new double [neq_pp_OF];
     
     double gravity(readScalar(solidProperties().lookup("gravity")));
-    gravlo_ = new double [neq_pp_OF];
 
+    gravlo_ = new double [neq_pp_OF];
 
     if(gravity > 1e-6)
     { 
 	    Info << "Gravity Loading, gravity: " << gravity << " m/s^2" << endl; 
+
 
 	    // Specific weight lambda = rho * g (gloads: direction of negative y implied)
 	    double specWeight=gravity*rhotmp_;;
@@ -584,6 +633,13 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         a_OF_[i]=0;
     }
 
+    delete[] g_num_OF_;
+    delete[] mPoints_;
+    delete[] rest_ensi_;
+    delete[] rest_;
+    delete[] nodeensi_;
+    delete[] sense_;
+
 }
 
 DyParaFEMSolid::~DyParaFEMSolid()
@@ -610,6 +666,9 @@ DyParaFEMSolid::~DyParaFEMSolid()
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+
 
 vector DyParaFEMSolid::pointU(label pointID) const
 {
@@ -1461,13 +1520,13 @@ bool DyParaFEMSolid::evolve()
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
- 
+
     #include "updateForce.H"
 
     vectorField& oldPointDI = pointD_.oldTime().internalField();
     vectorField& oldPointUI = pointU_.oldTime().internalField();
     vectorField& oldPointAI = pointA_.oldTime().internalField();
-     
+
     forAll(oldPointDI, pointI)
     {
 	 d_OF_[pointI*ndim + 0]=oldPointDI[pointI].x();
@@ -1483,7 +1542,6 @@ bool DyParaFEMSolid::evolve()
 	 a_OF_[pointI*ndim + 2]=oldPointAI[pointI].z();
      } 
 
-    // Print Force to Parafem 
 //    checkforce_
 //    (
 //        fext_OF_,
@@ -1493,9 +1551,7 @@ bool DyParaFEMSolid::evolve()
 //        &numPoints
 //    );
 
-    reduce(tmp,sumOp<label>());
-
-    // Inputs to Parafem 
+    // Inputs to Parafem
     runparafem_
     (
 	numSchemes_,
@@ -1503,19 +1559,18 @@ bool DyParaFEMSolid::evolve()
         forceNodes_,
         &numFixedForceNodes_,
         d_OF_,
-	u_OF_,
-	a_OF_,
-	&time,	
+		u_OF_,
+		a_OF_,
+		&time,	
         &numPoints,
         g_g_pp_OF_,
         g_num_pp_OF_,
         store_km_pp_OF_,
-	store_mm_pp_OF_,
+		store_mm_pp_OF_,
         diag_precon_pp_OF_,
-	gravlo_
+		gravlo_
     );
 
-    reduce(tmp,sumOp<label>());
    // ParaFEM Outputs from both processors the full
    // ptD, ptU and ptA arrays
     vectorField& pointDI = pointD_.internalField();
@@ -1568,7 +1623,7 @@ void DyParaFEMSolid::updateFields()
 {
 
     Info << "updateFields:" << endl;
-    volToPoint_.interpolate(D_, pointD_);
+    //volToPoint_.interpolate(D_, pointD_);
 
     rho_ = rheology_.rho();
 //    mu_ = rheology_.mu();
@@ -1609,6 +1664,22 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
     if (moveMesh)
     {
 
+	// startPoints is the reference coordinates of 
+	// initial configuration
+
+	pointIOField startPoints
+        (
+            IOobject
+            (
+                "points",
+                runTime().caseConstant(),
+                polyMesh::meshSubDir,
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
         pointIOField curPoints
         (
             IOobject
@@ -1627,7 +1698,8 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
 
         forAll (pointDI, pointI)
         {
-            curPoints[pointI] += pointDI[pointI];
+           // curPoints[pointI] += pointDI[pointI];
+	    curPoints[pointI]=startPoints[pointI]+pointDI[pointI];
         }
 
         // Unused points (procedure developed by Philip Cardiff, UCD) 

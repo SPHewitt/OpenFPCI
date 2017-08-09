@@ -1,35 +1,46 @@
-  !* Subroutines Used in OpenFOAM 
-  !* Date Updated (20th May 2016)
-  !* The routines are based on the decomposition of Program 12.9
-  !* Found in "Programming the Finite Element Method"
-  !* P12.9 is the parallel analysis of force Vibration of a
-  !* linear elastic Solid.
-
-  !/****h* /dyparafemsubroutine
+  !/****h* /dyparafemsubroutines
   !*  NAME
-  !*    XXXXXX: parafemsubroutine
+  !*    dyparafemsubroutines
+  !*
   !*  SYNOPSIS
-  !*    Usage:      Make/options file
-  !*	EXE_LIBS = \
-  !* 	~/foam/mclsssh5-3.2/src/fluidSolidInteraction/solidSolvers/
-  !*	      DyParaFEMSolid/dyparafemsubroutines.o \
+  !*    Usage:	This group of subroutines needs to me added to the
+  !*		Make file of the top level solver (fsiFoam)
+  !*
+  !* 		Make/options, The following libraries need to be added
+  !*
+  !* 		"path to folder"/dyparafemsubroutines.o \
+  !*		-L/"path To paraFEM"/lib -lParaFEM_mpi.5.0.3 \
+  !*		-L/"path To paraFEM"/lib -larpack_linuxdesktop \
+  !*		-lgfortran \
+  !*		-l/"Path To Mpi"/lib -lmpi_f90 \
+  !*
   !*	
   !*  FUNCTION
+  !*	This is a group of subroutines required for the OpenFPCI.
+  !*	These routines are based on the decomposition of program 12.9 
+  !* 	found in "Programming the Finite Element Method".
+  !*	P12.9 is the parallel analysis of the forced vibration of a
+  !*	linear elastic solid.
+  !* 	
   !*    
-  !*    Subroutine          	Purpose
+  !*    SUBROUTINE          PURPOSE
   !*
-  !*    initparafem		Generates Initial Matricies and arrays
-  !*	finddiagprecon 		Finds Diagonal Preconditioner
-  !*	runparafem 	
-  !*	checkparafem 		Prints the Mesh and geometry to file (ensi)
-  !*	forcecheck 		Prints the loads at each node to file (ensi)
-  !*	of2sg 			Steering Matrix : OpenFOAM to Smith Griffiths format
-  !*	gloads			Gravity Loading 
+  !*    initparafem:		Generates Initial Matricies and arrays
+  !*	finddiagprecon:		Finds Diagonal Preconditioner
+  !*	runparafem:			Solves the governing equations  	
+  !*	checkparafem 		Write Mesh and geometry to file (ensi)
+  !*	forcecheck 			Write the loads to file (ensi)
+  !*	of2sg 				OpenFOAM to Smith Griffiths format
+  !*	gloads				Gravity Loading
+  !*	writeToFile			Writes float field to file(debugging)
+  !*	writeToFileInt		Writes int field to file(debugging)
+  !*	system_mem_usage	Obtains the RSS and VM at call
+  !*		 
   !*	
-  !*    function          	Purpose
+  !*    FUNCTION          	PURPOSE
   !* 
-  !*	findnelspp		Returns nels_pp to c++
-  !*	findneqpp		Returns neq_pp to c++
+  !*	findnelspp			Returns nels_pp to c++
+  !*	findneqpp			Returns neq_pp to c++
   !*
   !*  AUTHORS
   !* 	S.Hewitt
@@ -43,29 +54,32 @@
   !------------------------------------------------------------------------------
 
   SUBROUTINE initparafem(g_coord,g_num,rest,nn,nels,nr,sProp,g_g_pp,store_km_pp,store_mm_pp,g_num_pp)
+  !/****f*dyparafemsubroutines/initparafem
   !*  NAME
   !*    SUBROUTINE: initparafem
+  !*
   !*  SYNOPSIS
   !*    Usage:      initparafem_(MeshData,g_num_OF,rest,&numPoints,	&
-  !*				&numCells,&nr,&e,&pois,steerG,stiff);                                  
+  !*			&numCells,&nr,&e,&pois,steerG,stiff);   
+  !*            
   !*  FUNCTION
-  !*    Initialises ParaFEM, calculating the stiffness matirx [k]
-  !*     and steering matrix (g_g_pp). 
+  !*    Initialises ParaFEM, calculating the stiffness matirx [k], 
+  !*	Mass Matrix [M] and steering matrix (g_g_pp).
   !*
   !*  INPUTS
   !*    g_coord(ndim,nn)	: Mesh coordinates (stressMesh OpenFOAM)		
   !*	g_num(nod,nels)		: Steering Matrix (OF Format) 				
   !*	rest(nr,nodof+1)	: Restrained Nodes example:(node# 0 0 0)
-  !* 	nn			: # of Nodes
-  !*	nels			: # of elements
-  !*	nr 			: # of restrained Nodes
-  !*    sProp			: Solid Properties (e v rho) 	 
+  !* 	nn					: # of Nodes
+  !*	nels				: # of elements
+  !*	nr 					: # of restrained Nodes
+  !*    sProp				: Solid Properties (e v rho) 	 
   !*	  			
   !*  OUTPUTS:
-  !*   	g_g_pp(ntot,nels_pp)		: Global Steering Matrix
+  !*   	g_g_pp(ntot,nels_pp)			: Global Steering Matrix
   !*   	store_km_pp(ntot,ntot,nels_pp)	: Stiffness Matrix [k]
   !*   	store_mm_pp(ntot,ntot,nels_pp)	: Mass Matrix [M]
-  !*	g_num_pp(nod,nels_pp)		: Steering Matrix
+  !*	g_num_pp(nod,nels_pp)			: Steering Matrix
   !*			
   !*  AUTHORS
   !*    S. Hewitt
@@ -73,107 +87,214 @@
   !*  COMMENTS
   !*    neq,ntot are now global variables - must not be declared
   !* --------------------------------------------------------------------
-  USE mpi_wrapper  !remove comment for serial compilation
-  USE precision; USE global_variables; USE mp_interface; USE input
-  USE output; USE loading; USE timing; USE maths; USE gather_scatter
-  USE steering; USE new_library; IMPLICIT NONE
 
-  INTEGER,PARAMETER::nodof=3,ndim=3,nst=6,nod=8
-  INTEGER,INTENT(IN) ::nels,nn,g_num(nod,nels)
-  INTEGER,INTENT(INOUT)::g_g_pp(ndim*nod,nels_pp),g_num_pp(nod,nels_pp),&
-     rest(nr,nodof+1)
-  INTEGER::iel,i,j,k,l,m,n,nr,nip,ndof,npes_pp,nlen,partitioner,	&
-     printres,RSS,VM,RSSa,VMa
-  REAL(iwp),PARAMETER::zero=0.0_iwp
-  REAL(iwp),INTENT(IN)::g_coord(ndim,nn),sProp(3)
-  REAL(iwp),INTENT(INOUT)::store_km_pp(ndim*nod,ndim*nod,nels_pp),	&
-     store_mm_pp(ndim*nod,ndim*nod,nels_pp)
+  USE mpi_wrapper;		USE precision; 	USE global_variables; 
+  USE mp_interface;		USE input;		USE output; 
+  USE loading; 			USE timing; 	USE maths; 
+  USE gather_scatter;	USE steering; 	USE new_library;
+
+  IMPLICIT NONE
+
+!------------------------------------------------------------------------------ 
+! 1. Declare variables
+!------------------------------------------------------------------------------
+
+  INTEGER,PARAMETER			::nodof=3,ndim=3,nst=6,nod=8
+  REAL(iwp),PARAMETER		::zero=0.0_iwp
+
+  INTEGER,INTENT(IN) 		::nels,nn,g_num(nod,nels)
+
+  INTEGER,INTENT(INOUT)		::g_g_pp(ndim*nod,nels_pp),rest(nr,nodof+1)
+  INTEGER,INTENT(INOUT)		::g_num_pp(nod,nels_pp)
+
+  INTEGER					::iel,i,j,k,l,m,n,nr,nip,ndof,npes_pp,nlen
+  INTEGER					::partitioner,printres,RSS,VM,RSSa,VMa
+
+  REAL(iwp),INTENT(INOUT)	::g_coord(ndim,nn),sProp(3)
+  REAL(iwp),INTENT(INOUT)	::store_km_pp(ndim*nod,ndim*nod,nels_pp)
+  REAL(iwp),INTENT(INOUT)	::store_mm_pp(ndim*nod,ndim*nod,nels_pp)
+
   REAL(iwp)::det,period,volume,tol,e,v,rho	
-  LOGICAL::converged=.false.,consistent=.TRUE.,initialised
-  CHARACTER(LEN=50)::argv; CHARACTER(LEN=15)::element; CHARACTER(LEN=6)::ch  
 
-  !---------------------------- dynamic arrays --------------------------
-  REAL(iwp),ALLOCATABLE::points(:,:),dee(:,:),weights(:),timest(:),	&
-     jac(:,:),der(:,:),deriv(:,:),bee(:,:),fun(:),emm(:,:),ecm(:,:),	&
-     g_coord_pp(:,:,:)
-  INTEGER,ALLOCATABLE::node(:),localcount(:),readcount(:)
+  LOGICAL					::converged=.false.
+  LOGICAL					::consistent=.TRUE.
+  LOGICAL					::initialised
+  CHARACTER(LEN=50)::argv
+  CHARACTER(LEN=15)::element
+  CHARACTER(LEN=6)::ch  
+
+!------------------------------------------------------------------------------
+! 2. Declare dynamic arrays
+!------------------------------------------------------------------------------
+
+  REAL(iwp),ALLOCATABLE		::points(:,:),dee(:,:),weights(:),timest(:)
+  REAL(iwp),ALLOCATABLE		::jac(:,:),der(:,:),deriv(:,:),bee(:,:)
+  REAL(iwp),ALLOCATABLE		::fun(:),emm(:,:),ecm(:,:),g_coord_pp(:,:,:)
+
+  INTEGER,ALLOCATABLE		::node(:),localcount(:),readcount(:)
  
  CALL system_mem_usage(RSSa,VMa)
- !------------------------ input and initialisation ---------------------  
+ 
+!------------------------------------------------------------------------------
+! 3. Input and Initialisation
+!------------------------------------------------------------------------------ 
+
+  ! Variables required for writing and partioning
   argv="Case"; nlen=4; nip=8; element="hexahedron"; partitioner=1
+
+  ! Youndgs Modulus, Poissons Ratio and Density
   e=sProp(1);v=sProp(2);rho=sProp(3);
 
-  ALLOCATE(timest(20));timest=zero;timest(1)=elap_time()
+  ALLOCATE(timest(20))
+  timest	=  zero
+  timest(1)	=  elap_time()
 
+  ! Test for MPI Initialisation
   CALL MPI_INITIALIZED(initialised,ier) 
+  
   IF(initialised .EQV. .false.)THEN
-    CALL find_pe_procs(numpe,npes); numpe=1; npes=1;
+    CALL find_pe_procs(numpe,npes)
+    numpe  =  1
+    npes   =  1
   ELSE
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD,numpe,ier); numpe=numpe+1
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD,numpe,ier)
+    ! C++ starts at 0, fortran 1
+    numpe  =  numpe+1
     CALL MPI_COMM_SIZE(MPI_COMM_WORLD,npes,ier); 
   ENDIF
   
+  ! Calculate number of Elements per Core
   CALL calc_nels_pp(argv,nels,npes,numpe,partitioner,nels_pp)
-  ndof=nod*nodof; ntot=ndof;
 
-  !------------------------ Populate G_NUM_PP & G_COORD_PP --------
+  ! Degrees of Freedon per Element
+  ndof  =  nod*nodof
+  ntot	=  ndof;
+  
+
+!------------------------------------------------------------------------------
+! 4. Populate g_coord_pp and g_num_pp
+!------------------------------------------------------------------------------ 
   timest(2)=elap_time();
+  
   ALLOCATE(g_coord_pp(nod,ndim,nels_pp))
-   g_coord_pp=zero; g_num_pp=zero;
+  g_coord_pp  =  zero
+  g_num_pp	  =  zero
+  
+  ! Poulate the Steering matrix
   CALL POPULATE_G_NUM_PP(g_num,g_num_pp,npes,nod,nels)
-  DO iel=1,nels_pp; CALL of2sg(element,g_num_pp(:,iel),nod); ENDDO
+  
+  ! Convert from OpenFOAM to Smith Gritths format
+  DO iel=1,nels_pp
+    CALL of2sg(element,g_num_pp(:,iel),nod)
+  ENDDO
+  
+  ! Populate Coorinate Matrix
   CALL POPULATE_G_COORD_PP(g_coord,g_coord_pp,g_num_pp,npes,nn,nod,ndim)
+  
   timest(3)=elap_time();
+  
+!------------------------------------------------------------------------------
+! 5. Find the Steering arrays and equations per core
+!------------------------------------------------------------------------------ 
 
-  ALLOCATE(points(nip,ndim),dee(nst,nst),jac(ndim,ndim),der(ndim,nod),	&
-     deriv(ndim,nod),bee(nst,ntot),weights(nip),ecm(ntot,ntot),		&
-     emm(ntot,ntot),fun(nod))
-  !fun(ntot) changed to fun(nod)	
+  ALLOCATE(points(nip,ndim),dee(nst,nst),jac(ndim,ndim))
+  ALLOCATE(der(ndim,nod),deriv(ndim,nod),bee(nst,ntot))
+  ALLOCATE(weights(nip),ecm(ntot,ntot),emm(ntot,ntot),fun(nod))
 
-  !----------  find the steering array and equations per process ---------
   timest(4)=elap_time()
-  CALL rearrange(rest); g_g_pp=zero; neq=zero
+  
+  ! Rearrange the rest Array
+  CALL rearrange(rest)
+  
+  ! Clean arrays
+  g_g_pp  =  zero
+  neq	  =  zero
+  
+  ! Find the global Steering Matrix
   elements_0: DO iel=1,nels_pp
   ! CALL find_g(g_num_pp(:,iel),g_g_pp(:,iel),rest)
     CALL find_g3(g_num_pp(:,iel),g_g_pp(:,iel),rest)
   END DO elements_0
+  
   timest(5)=elap_time()
-  neq=MAXVAL(g_g_pp); neq=max_p(neq);
-  CALL calc_neq_pp; CALL calc_npes_pp(npes,npes_pp);
+  
+  ! Build GGL Array
+  neq  =  MAXVAL(g_g_pp)
+  neq  =  max_p(neq)
+  CALL calc_neq_pp
+  CALL calc_npes_pp(npes,npes_pp)
   CALL make_ggl(npes_pp,npes,g_g_pp)
+  
   timest(6)=elap_time()	
 
-  !--- element stiffness and mass integration, storage and preconditioner
+!------------------------------------------------------------------------------
+! 5. Element Stiffness and Mass Integration
+!------------------------------------------------------------------------------ 
+
   timest(7)=elap_time()	
-  dee=zero; CALL deemat(dee,e,v); CALL sample(element,points,weights)
-  store_km_pp=zero; store_mm_pp=zero; 
-  elements_2: DO iel=1,nels_pp;   volume=zero; emm=zero; ecm=zero
-   gauss_points_1: DO i=1,nip     
-     CALL shape_der(der,points,i); jac=MATMUL(der,g_coord_pp(:,:,iel))
-     det=determinant(jac); CALL invert(jac); deriv=matmul(jac,der)
-     CALL beemat(bee,deriv)
-     store_km_pp(:,:,iel)=store_km_pp(:,:,iel) +                        & 
+  
+  ! [D] : Stress-Strain Matrix
+  dee  =  zero 
+  CALL deemat(dee,e,v)
+  CALL sample(element,points,weights)
+  
+  ! Clean [K] and [M] 
+  store_km_pp  =  zero
+  store_mm_pp  =  zero
+  
+  elements_2: DO iel=1,nels_pp
+    volume  =  zero
+    emm  	=  zero
+    ecm  	=  zero
+    
+    gauss_points_1: DO i=1,nip  
+      ! [N] : Shape Functions   
+      CALL shape_der(der,points,i)
+      
+      ! [J] : Jacobian, global to local derivative
+      jac=MATMUL(der,g_coord_pp(:,:,iel))
+      
+      ! det|J|
+      det=determinant(jac)
+      CALL invert(jac)
+      deriv=matmul(jac,der)
+      
+      ! [B] : Strain - Displacement Matrix 
+      CALL beemat(bee,deriv)
+      
+      ! Integration for [K]
+      store_km_pp(:,:,iel)=store_km_pp(:,:,iel) +                        & 
                           MATMUL(MATMUL(TRANSPOSE(bee),dee),bee) *      &
                           det*weights(i)
-     volume=volume+det*weights(i); CALL shape_fun(fun,points,i)
-     IF(consistent)THEN; CALL ecmat(ecm,fun,ntot,nodof)
-       ecm=ecm*det*weights(i)*rho; emm=emm+ecm
+     volume=volume+det*weights(i)
+     CALL shape_fun(fun,points,i)
+     
+     ! Integration for [M]
+     IF(consistent)THEN
+       CALL ecmat(ecm,fun,ntot,nodof)
+       ecm  =  ecm*det*weights(i)*rho
+       emm  =  emm+ecm
      END IF
-   END DO gauss_points_1   
-   IF(.NOT.consistent)THEN
-     DO i=1,ntot; emm(i,i)=volume*rho/13._iwp; END DO
-     DO i=1,19,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
-     DO i=2,20,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
-     DO i=3,21,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
-     DO i=37,55,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
-     DO i=38,56,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
-     DO i=39,57,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
-   END IF
-   store_mm_pp(:,:,iel)=emm
+    END DO gauss_points_1   
+    IF(.NOT.consistent)THEN
+      DO i=1,ntot; emm(i,i)=volume*rho/13._iwp; END DO
+      DO i=1,19,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
+      DO i=2,20,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
+      DO i=3,21,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
+      DO i=37,55,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
+      DO i=38,56,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
+      DO i=39,57,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
+    END IF
+    store_mm_pp(:,:,iel)  =  emm
   END DO elements_2  
+  
   timest(8)=elap_time()	
-  printres=1
-  !------ Print Information about Runtime to File -------
+  
+!------------------------------------------------------------------------------
+! 6. Print Information about Runtime to File
+!------------------------------------------------------------------------------ 
+  printres  =  1
+  
   IF(numpe==1 .AND. printres==1)THEN
   CALL system_mem_usage(RSS,VM)
   OPEN(11,FILE=argv(1:nlen)//".res",STATUS='REPLACE',ACTION='WRITE')
@@ -192,26 +313,30 @@
   CLOSE(11)
   END IF
   
-  DEALLOCATE(points,dee,jac,der,deriv,bee,weights,ecm,emm,fun,g_coord_pp,timest)
+  DEALLOCATE(points,dee,jac,der,deriv,bee)
+  DEALLOCATE(weights,ecm,emm,fun,g_coord_pp,timest)
  
   END SUBROUTINE
 
   !-----------------------------------------------------------------------
-  !------------------------------------------------  CALL MPI_BARRIER(MPI_COMM_WORLD,ier)-----------------------
+  !-----------------------------------------------------------------------
   !-----------------------------------------------------------------------
 
   SUBROUTINE finddiagparafem(store_km_pp,store_mm_pp,numVar,diag_precon_pp)
+  !/****f*dyparafemsubroutines/finddiagparafem
   !*  NAME
   !*    SUBROUTINE: finddiagparafem
+  !*
   !*  SYNOPSIS
   !*    Usage:      finddiagparafem_(stiff,precon); 
+  !*
   !*  FUNCTION
   !*    Calculates the diagonal preconditioner matrix
   !*
   !*  INPUTS
   !*     store_km_pp(ntot,ntot,nels_pp)	: Stiffness Matrix	
   !*     store_mm_pp(ntot,ntot,nels_pp)	: Mass Matrix
-  !*     numVar				: Array(alpha1 beta1 theta dTim) 			
+  !*     numVar							: Array(alpha1 beta1 theta dTim) 			
   !*	 			
   !*  OUTPUTS:
   !*   	diag_precon_pp(neq_pp)		: Diagonal Preconditioner
@@ -220,31 +345,64 @@
   !*    S. Hewitt
   !*/
   !* -------------------------------------------------------------------
-  USE mpi_wrapper  !remove comment for serial compilation#
-  USE precision; USE global_variables; USE mp_interface; USE input
-  USE output; USE loading; USE timing; USE maths; USE gather_scatter
-  USE steering; USE new_library; IMPLICIT NONE
-  ! neq,ntot are now global variables - must not be declared
-  INTEGER,PARAMETER::nodof=3,ndim=3,nst=6
-  INTEGER::i,j,k,iel,ndof
-  REAL(iwp),PARAMETER::zero=0.0_iwp
-  REAL(iwp),INTENT(IN)::store_km_pp(ndim*8,ndim*8,nels_pp),numVar(4),	&
-		       store_mm_pp(ndim*8,ndim*8,nels_pp)
-  REAL(iwp),INTENT(INOUT)::diag_precon_pp(neq_pp)
-  REAL(iwp)::tmp(neq_pp),alpha1,beta1,theta,dtim,c3,c4
-  REAL(iwp),ALLOCATABLE::timest(:),diag_precon_tmp(:,:)
-  alpha1=numVar(1); beta1=numVar(2); theta=numVar(3)
-  dtim=numVar(4)
-  c3=alpha1+1._iwp/(theta*dtim); c4=beta1+theta*dtim
-  diag_precon_pp=zero; ndof=ntot
-  ALLOCATE(diag_precon_tmp(ntot,nels_pp)); diag_precon_tmp=zero
-  elements_2: DO iel=1,nels_pp ;DO k=1,ndof
-   diag_precon_tmp(k,iel)=diag_precon_tmp(k,iel)    +             	&
+  
+  USE mpi_wrapper;		USE precision;	USE global_variables; 
+  USE mp_interface; 	USE input;		USE output; 
+  USE loading; 			USE timing; 	USE maths; 
+  USE gather_scatter;	USE steering; 	USE new_library; 
+  
+  IMPLICIT NONE
+  
+!------------------------------------------------------------------------------ 
+! 1. Declare variables used in the main program
+!------------------------------------------------------------------------------
+
+  INTEGER,PARAMETER			::nodof=3,ndim=3,nst=6
+  REAL(iwp),PARAMETER		::zero=0.0_iwp
+  
+  INTEGER					::i,j,k,iel,ndof
+
+  REAL(iwp),INTENT(IN)		::store_km_pp(ndim*8,ndim*8,nels_pp)
+  REAL(iwp),INTENT(IN)		::store_mm_pp(ndim*8,ndim*8,nels_pp)
+  REAL(iwp),INTENT(IN)		::numVar(4)
+  
+  REAL(iwp),INTENT(INOUT)	::diag_precon_pp(neq_pp)
+  
+  REAL(iwp)					::tmp(neq_pp),alpha1,beta1,theta,dtim,c3,c4
+  
+  REAL(iwp),ALLOCATABLE		::timest(:),diag_precon_tmp(:,:)
+  
+  ! Set Parameters
+  alpha1  =  numVar(1)
+  beta1   =  numVar(2)
+  theta   =  numVar(3)
+  dtim	  =  numVar(4)
+  c3	  =  alpha1+1._iwp/(theta*dtim)
+  c4	  =  beta1+theta*dtim
+  ndof    =  ntot
+  
+  
+!------------------------------------------------------------------------------ 
+! 2. Calculate Diagonal preconditioner
+!------------------------------------------------------------------------------
+  ALLOCATE(diag_precon_tmp(ntot,nels_pp))
+  
+  diag_precon_pp  =  zero
+  diag_precon_tmp  =  zero
+  
+  elements_2: DO iel=1,nels_pp
+    DO k=1,ndof
+      diag_precon_tmp(k,iel)=diag_precon_tmp(k,iel)    +             &
                    store_mm_pp(k,k,iel)*c3+store_km_pp(k,k,iel)*c4
-  END DO; END DO elements_2
+    END DO
+  END DO elements_2
+  
   CALL scatter(diag_precon_pp,diag_precon_tmp); 
+  
   DEALLOCATE(diag_precon_tmp)
+  
   diag_precon_pp=1.0_iwp/diag_precon_pp 
+  
   END SUBROUTINE
 
   !-----------------------------------------------------------------------
@@ -253,25 +411,29 @@
 
   SUBROUTINE runparafem(numVar,val,node,loaded_nodes,ptD,ptU,ptA,time,nn, 	&
                       g_g_pp,g_num_pp,store_km_pp,store_mm_pp,diag_precon_pp,gravlo)
+  
+  !/****f*dyparafemsubroutines/runparafem
   !*  NAME
   !*    SUBROUTINE: runparafem
+  !*
   !*  SYNOPSIS
-  !*    Usage:	
+  !*    Usage:
+  !* 	
   !*  FUNCTION
-  !*    Calculates Nodal displacements 
+  !*    Solve the governing equations and output the results 
   !*
   !*  INPUTS
-  !*	numVar				: (alpha1 beta1 theta dtim)
-  !*	val(ndim,loaded_nodes)		: Force vector of loaded nodes
-  !*   	node(loaded_nodes)		: Node # of loaded_nodes
-  !*	loaded_nodes			: # of loaded nodes		
-  !*	nn				: Number of solid Points 		  
-  !*    g_g_pp(ntot,els)		: Global Steering Matrix
-  !*	g_num_pp(nod,nels)		: Steering Matrix
+  !*	numVar							: (alpha1 beta1 theta dtim)
+  !*	val(ndim,loaded_nodes)			: Force vector of loaded nodes
+  !*   	node(loaded_nodes)				: Node # of loaded_nodes
+  !*	loaded_nodes					: # of loaded nodes		
+  !*	nn								: Number of solid Points 		  
+  !*    g_g_pp(ntot,els)				: Global Steering Matrix
+  !*	g_num_pp(nod,nels)				: Steering Matrix
   !*    storkm_pp(ntot,ntot,nels_pp)	: Stiffness Matrix [k]
   !*    stormm_pp(ntot,ntot,nels_pp)	: Mass Matrix [M]
-  !*	diag_precon_pp(neq_pp)		: Diagonal Preconditioner	
-  !*	gravlo(neq_pp)			: vector of gravity loads		
+  !*	diag_precon_pp(neq_pp)			: Diagonal Preconditioner	
+  !*	gravlo(neq_pp)					: vector of gravity loads		
   !*			
   !*  OUTPUTS:
   !*  	ptD(ndim,nn)			: Nodal displacements
@@ -285,81 +447,146 @@
   !*		Excludes the force vectors on the restrained nodes.		
   !*/
   !* -------------------------------------------------------------------!
-  !USE mpi_wrapper  !remove comment for serial compilation
-  USE precision; USE global_variables; USE mp_interface; USE input
-  USE output; USE loading; USE timing; USE maths; USE gather_scatter
-  USE steering; USE new_library; IMPLICIT NONE
+  
+    
+  USE mpi_wrapper;		USE precision;	USE global_variables; 
+  USE mp_interface; 	USE input;		USE output; 
+  USE loading; 			USE timing; 	USE maths; 
+  USE gather_scatter;	USE steering; 	USE new_library; 
+  
+  IMPLICIT NONE
+  
+!------------------------------------------------------------------------------ 
+! 1. Declare variables used in the main program
+!------------------------------------------------------------------------------
 
-  !neq,ntot are now global variables - must not be declared
-  INTEGER,PARAMETER::nodof=3,ndim=3,nst=6,nod=8
-  INTEGER,INTENT(INOUT)::nn,loaded_nodes,node(loaded_nodes),		&
-    g_num_pp(nod,nels_pp),g_g_pp(ntot,nels_pp)
-  INTEGER::iel,i,j,k,l,m,n,iters,limit,nels,node_end,node_start,	&
-    nodes_pp,nlen,myCount,disps(npes),nodesCount(npes),printres,RSS,VM,	&
-    RSSa,VMa   
-  REAL(iwp),PARAMETER::zero=0.0_iwp,one=1.0_iwp
-  REAL(iwp),INTENT(INOUT) :: diag_precon_pp(neq_pp),			&
-    store_km_pp(ntot,ntot,nels_pp),store_mm_pp(ntot,ntot,nels_pp),	&
-    numVar(4),time,gravlo(neq_pp)
-  REAL(iwp),INTENT(INOUT) :: ptD(ndim,nn),ptU(ndim,nn),	&
-    ptA(ndim,nn),val(ndim,loaded_nodes)
-  REAL(iwp)::tol,up,alpha,beta,alpha1,beta1,theta,dtim,c1,c2,c3,c4,	&
-    val_2D(ndim,loaded_nodes)
-  LOGICAL::converged
-  CHARACTER(LEN=50)::argv; CHARACTER(LEN=15)::element;
-  CHARACTER(LEN=80):: FMT
-  !------------------------- dynamic arrays ------------------------------!
-  REAL(iwp),SAVE,ALLOCATABLE::loads_pp(:),fext_pp(:),x1_pp(:),d1x1_pp(:),&
-   d2x1_pp(:),x0_pp(:),d1x0_pp(:),d2x0_pp(:),vu_pp(:),u_pp(:),p_pp(:),	&
-   d_pp(:),x_pp(:),xnew_pp(:),pmul_pp(:,:),utemp_pp(:,:),temp(:),	&
-   d1temp(:),d2temp(:),temp_pp(:,:,:),disp_pp(:),vel_pp(:),acel_pp(:),	&
-   timest(:),eld_pp(:,:),ptDtemp(:,:),ptUtemp(:,:),ptAtemp(:,:),	&
-   gDisp(:),gVel(:),gAcel(:),fext_o_pp(:)
+  INTEGER,PARAMETER			::nodof=3,ndim=3,nst=6,nod=8
+  REAL(iwp),PARAMETER		::zero=0.0_iwp,one=1.0_iwp
+  
+  INTEGER,INTENT(INOUT)		::nn,loaded_nodes,node(loaded_nodes)
+  INTEGER,INTENT(INOUT)		::g_num_pp(nod,nels_pp)
+  INTEGER,INTENT(INOUT)		::g_g_pp(ntot,nels_pp)
+  
+  INTEGER					::iel,i,j,k,l,m,n,iters,printres
+  INTEGER					::limit,nels,node_end,node_start
+  INTEGER					::nodes_pp,nlen,myCount,disps(npes)
+  INTEGER					::nodesCount(npes),RSS,VM,RSSa,VMa   
 
+  REAL(iwp),INTENT(INOUT) 	::diag_precon_pp(neq_pp)
+  REAL(iwp),INTENT(INOUT) 	::store_km_pp(ntot,ntot,nels_pp)
+  REAL(iwp),INTENT(INOUT) 	::store_mm_pp(ntot,ntot,nels_pp)
+  REAL(iwp),INTENT(INOUT) 	::numVar(4),time,gravlo(neq_pp)
+  REAL(iwp),INTENT(INOUT) 	::ptD(ndim,nn),ptU(ndim,nn)
+  REAL(iwp),INTENT(INOUT) 	::ptA(ndim,nn),val(ndim,loaded_nodes)
+  
+  REAL(iwp)					::tol,up,alpha,beta,alpha1,beta1,theta,dtim
+  REAL(iwp)					::c1,c2,c3,c4,val_2D(ndim,loaded_nodes)
+  
+  LOGICAL					::converged
+  CHARACTER(LEN=50)			::argv
+  CHARACTER(LEN=15)			::element;
+  CHARACTER(LEN=80)			:: FMT
+  
+!------------------------------------------------------------------------------
+! 2. Declare dynamic arrays
+!------------------------------------------------------------------------------
+  REAL(iwp),SAVE,ALLOCATABLE::loads_pp(:),fext_pp(:),x1_pp(:),d1x1_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE::d2x1_pp(:),x0_pp(:),d1x0_pp(:),d2x0_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE::vu_pp(:),u_pp(:),p_pp(:),d_pp(:),x_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE::xnew_pp(:),pmul_pp(:,:),utemp_pp(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE::temp(:),d1temp(:),d2temp(:),temp_pp(:,:,:)
+  REAL(iwp),SAVE,ALLOCATABLE::disp_pp(:),vel_pp(:),acel_pp(:),eld_pp(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE::ptAtemp(:,:),ptDtemp(:,:),ptUtemp(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE::gDisp(:),gVel(:),gAcel(:)
+  REAL(iwp),SAVE,ALLOCATABLE::fext_o_pp(:),timest(:)
+  
+  
+!------------------------------------------------------------------------------
+! 3. Start Program
+!------------------------------------------------------------------------------
   IF(numpe .EQ. 1)PRINT*,"ParaFEM: "
+  
+  ! Barrier (may not be needed but safe)
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
-  !--------------------- Set Variables for Mesh_ensi ---------------------!
-  argv="Case"; nlen=4; limit=1000; tol=1e-6; element="hexahedron"
-  !--------------------- Numerical Parameters ----------------------------!
-  alpha1=numVar(1); beta1=numVar(2); theta=numVar(3);dtim=numVar(4)  
-  c1=(1._iwp-theta)*dtim; c2=beta1-c1; c3=alpha1+1._iwp/(theta*dtim);
-  c4=beta1+theta*dtim
-  !---------------------------- Run Analysis -----------------------------!
+  
+  ! Set Base paramenter
+  argv		=  "Case"		! Name files write to
+  nlen		=  4			! Length of Name
+  limit		=  1000			! Max number of Interation in PCG
+  tol		=  1e-6			! Tolerance of PCG loop
+  element	=  "hexahedron"	! Element Name
+  
+  ! Set Numerical and Material Values 
+  alpha1  =  numVar(1)
+  beta1   =  numVar(2)
+  theta   =  numVar(3)
+  dtim	  =  numVar(4)  
+  c1	  =  (1._iwp-theta)*dtim
+  c2	  =  beta1-c1
+  c3	  =  alpha1+1._iwp/(theta*dtim);
+  c4	  =  beta1+theta*dtim
+  
   ! Allocate memory required for the time loop
   IF(.NOT.ALLOCATED(timest))THEN
    CALL system_mem_usage(RSSa,VMa)
-   ALLOCATE(x0_pp(neq_pp),d1x0_pp(neq_pp),x1_pp(neq_pp),vu_pp(neq_pp),  &
-    u_pp(neq_pp),d2x0_pp(neq_pp),loads_pp(neq_pp),d1x1_pp(neq_pp),	&
-    d2x1_pp(neq_pp),d_pp(neq_pp),p_pp(neq_pp),x_pp(neq_pp),timest(20),	&
-    xnew_pp(neq_pp),fext_pp(neq_pp),ptDtemp(ntot,nels_pp),		&
-    ptUtemp(ntot,nels_pp),ptAtemp(ntot,nels_pp),pmul_pp(ntot,nels_pp),	&
-    utemp_pp(ntot,nels_pp),temp_pp(ntot,ntot,nels_pp),fext_o_pp(neq_pp))
-    fext_o_pp=zero
+   ALLOCATE(x0_pp(neq_pp),d1x0_pp(neq_pp),x1_pp(neq_pp),vu_pp(neq_pp))
+   ALLOCATE(u_pp(neq_pp),d2x0_pp(neq_pp),loads_pp(neq_pp))
+   ALLOCATE(d1x1_pp(neq_pp),d2x1_pp(neq_pp),d_pp(neq_pp),p_pp(neq_pp))
+   ALLOCATE(x_pp(neq_pp),timest(20),xnew_pp(neq_pp),fext_pp(neq_pp))
+   ALLOCATE(ptDtemp(ntot,nels_pp),ptUtemp(ntot,nels_pp))
+   ALLOCATE(ptAtemp(ntot,nels_pp),pmul_pp(ntot,nels_pp))
+   ALLOCATE(utemp_pp(ntot,nels_pp),temp_pp(ntot,ntot,nels_pp))
+   ALLOCATE(fext_o_pp(neq_pp))
+   fext_o_pp  =  zero
   ENDIF
-    timest=zero; timest(1)=elap_time()
-    x0_pp=zero; d1x0_pp=zero; x1_pp=zero; vu_pp=zero; u_pp=zero 
-    d2x0_pp=zero; loads_pp=zero; d1x1_pp=zero; d2x1_pp=zero
-    d_pp=zero; p_pp=zero; x_pp=zero; xnew_pp=zero; ptDtemp=zero;
-    ptUtemp=zero; ptAtemp=zero
-  !---------------------------------- Set loads --------------------------!
+    
+  timest=zero 
+  timest(1)=elap_time()
+  
+  ! Clean Arrays
+  x0_pp    =  zero;		d1x0_pp	 =  zero; 	x1_pp    =  zero; 
+  vu_pp    =  zero; 	u_pp	 =  zero;	d2x0_pp  =  zero; 
+  loads_pp =  zero; 	d1x1_pp  =  zero;	d2x1_pp  =  zero;
+  d_pp	   =  zero; 	p_pp	 =  zero;	x_pp	 =  zero; 
+  xnew_pp  =  zero; 	ptDtemp	 =  zero;	ptUtemp	 =  zero;
+  ptAtemp  =  zero
+  
+!------------------------------------------------------------------------------
+! 4. Set Loads
+!------------------------------------------------------------------------------
 
-  timest(2)=elap_time()
-  fext_pp=zero; val_2D=zero ;val_2D=val/2.0 ! Correction for 2D Meshes
+  timest(2)	=  elap_time()
+  fext_pp	=  zero
+  val_2D	=  zero
+  val_2D	=  val/2.0 ! Correction for 2D Meshes
+  
+  ! Load fext_pp based on global load vector
   CALL load(g_g_pp,g_num_pp,node,val_2D,fext_pp)
+  
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
+  
   !fext_pp=fext_pp+gravlo  ! Adding gravity if set
+  
   timest(3)=elap_time()
-
-  ! ----------------------- Set Initial Conditions -----------------------!
+  
+!------------------------------------------------------------------------------
+! 5. Set Initial Conditions
+!------------------------------------------------------------------------------
   ! NOTE: pmul_pp=ptDtemp_pp
 
   timest(4)=elap_time()
-  DO iel=1,nels_pp; DO i=1,nod; DO j=1,ndim
-   m=g_num_pp(i,iel)
-   ptDtemp(j+(i-1)*ndim,iel)=ptD(j,m)
-   ptUtemp(j+(i-1)*ndim,iel)=ptU(j,m)
-   ptAtemp(j+(i-1)*ndim,iel)=ptA(j,m)
-  ENDDO;ENDDO;ENDDO
+  
+  ! Copy OpenFOAM fields to ParaFEM
+  DO iel=1,nels_pp
+    DO i=1,nod
+      DO j=1,ndim
+   		m							=  g_num_pp(i,iel)
+   		ptDtemp(j+(i-1)*ndim,iel)	=  ptD(j,m)
+   		ptUtemp(j+(i-1)*ndim,iel)	=  ptU(j,m)
+   		ptAtemp(j+(i-1)*ndim,iel)	=  ptA(j,m)
+      ENDDO
+    ENDDO
+  ENDDO
 
 ! - scatter_noadd has no barriers in the subroutine
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
@@ -371,151 +598,241 @@
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
   timest(5)=elap_time()
-  !---------------------------- time stepping loop -----------------------!
-  u_pp=zero; vu_pp=zero; loads_pp=zero; pmul_pp=zero; temp_pp=zero;
-  !---------------------------- displacement part  -----------------------!
-   temp_pp=store_km_pp*c2+store_mm_pp*c3
+  
+!------------------------------------------------------------------------------
+! 6. Time Loop
+!------------------------------------------------------------------------------
+
+  u_pp		=  zero
+  vu_pp		=  zero
+  loads_pp	=  zero
+  pmul_pp	=  zero
+  temp_pp	=  zero
+  
+!------------------------------------------------------------------------------
+! 7. Displacement
+!------------------------------------------------------------------------------
+   temp_pp  =  store_km_pp*c2+store_mm_pp*c3
+   
    CALL gather(x0_pp,pmul_pp)
+   
    DO iel=1,nels_pp
      CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,                 &
                 pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
-   END DO; CALL scatter(u_pp,utemp_pp)
-  !---------------------------- velocity part ----------------------------!
-   temp_pp=store_mm_pp/theta; CALL gather(d1x0_pp,pmul_pp);utemp_pp=zero
+   END DO
+   
+   CALL scatter(u_pp,utemp_pp)
+   
+!------------------------------------------------------------------------------
+! 8. Velocity
+!------------------------------------------------------------------------------
+   temp_pp=store_mm_pp/theta
+   
+   CALL gather(d1x0_pp,pmul_pp);utemp_pp=zero
+   
    DO iel=1,nels_pp
      CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,                 &
                 pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
-   END DO;CALL scatter(vu_pp,utemp_pp) 
-  !---------------------------- Build RHS --------------------------------!
-  loads_pp = fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
-  fext_o_pp = fext_pp; loads_pp=u_pp+vu_pp+loads_pp
-  temp_pp=store_mm_pp*c3+store_km_pp*c4
-  timest(7)=elap_time()
-  !----------- solve simultaneous equations by PCG -----------------------!
+   END DO
+   
+   CALL scatter(vu_pp,utemp_pp) 
+   
+!------------------------------------------------------------------------------
+! 9. Bulid Right Hand Side
+!------------------------------------------------------------------------------
+
+  loads_pp 	=  fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
+  fext_o_pp =  fext_pp
+  loads_pp	=  u_pp+vu_pp+loads_pp
+  temp_pp	=  store_mm_pp*c3+store_km_pp*c4
+  
+  timest(7) =  elap_time()
+  
+!------------------------------------------------------------------------------
+! 10. PCG
+!------------------------------------------------------------------------------
   IF(ABS(SUM(loads_pp)) .GE. 1E-10)THEN
    IF(numpe .EQ. 1)PRINT*,"Solving using PCG"
    CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
-   d_pp=diag_precon_pp*loads_pp; p_pp=d_pp; x_pp=zero; iters=0
+   
+   d_pp  =  diag_precon_pp*loads_pp
+   p_pp  =  d_pp
+   x_pp  =  zero
+   iters =  0
+   
    iterations: DO
-     iters=iters+1;u_pp=zero; vu_pp=zero
+     iters =  iters+1
+     u_pp  =  zero
+     vu_pp =  zero
+     
      CALL gather(p_pp,pmul_pp)
+     
      elements_4: DO iel=1,nels_pp
- 	CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,               &
+ 	   CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,               &
                    pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
      END DO elements_4; 
+     
      CALL scatter(u_pp,utemp_pp)
-     up=DOT_PRODUCT_P(loads_pp,d_pp);
-     alpha=up/DOT_PRODUCT_P(p_pp,u_pp)
-     xnew_pp=x_pp+p_pp*alpha; 
-     loads_pp=loads_pp-u_pp*alpha
-     d_pp=diag_precon_pp*loads_pp; 
-     beta=DOT_PRODUCT_P(loads_pp,d_pp)/up  
-     p_pp=d_pp+p_pp*beta; 
-     u_pp=xnew_pp
+     
+     up			=  DOT_PRODUCT_P(loads_pp,d_pp);
+     alpha		=  up/DOT_PRODUCT_P(p_pp,u_pp)
+     xnew_pp	=  x_pp+p_pp*alpha; 
+     loads_pp	=  loads_pp-u_pp*alpha
+     d_pp		=  diag_precon_pp*loads_pp; 
+     beta		=  DOT_PRODUCT_P(loads_pp,d_pp)/up  
+     p_pp		=  d_pp+p_pp*beta; 
+     u_pp		=  xnew_pp
+     
      CALL checon_par(xnew_pp,tol,converged,x_pp)
+     
      IF(converged.OR.iters==limit)EXIT
    END DO iterations
+   
+!------------------------------------------------------------------------------
+! 11. PCG END
+!------------------------------------------------------------------------------
    CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
+   
    IF(numpe .EQ. 1)PRINT*,"Number of Iterations: ",iters
-  ENDIF
-   x1_pp=xnew_pp; utemp_pp=zero
-   d1x1_pp=(x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
-   d2x1_pp=(d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta
-   x0_pp=x1_pp; d1x0_pp=d1x1_pp; d2x0_pp=d2x1_pp;
+   ENDIF
+   x1_pp	=  xnew_pp
+   utemp_pp	=  zero
+   d1x1_pp	=  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
+   d2x1_pp	=  (d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta
+   x0_pp	=  x1_pp;
+   d1x0_pp	=  d1x1_pp
+   d2x0_pp	=  d2x1_pp;
+   
   timest(8)=elap_time()
-  !---------------------------- Ending time loop -------------------------!
-  !------------------ Passing Data Out -----------------------------------!
+  
+!------------------------------------------------------------------------------
+! 12. Gather Data from ntot,nels_pp to ndim,nodes_pp
+!------------------------------------------------------------------------------
   timest(9)=elap_time()
   CALL calc_nodes_pp(nn,npes,numpe,node_end,node_start,nodes_pp) 
 
   IF(.NOT.ALLOCATED(disp_pp))THEN
-   ALLOCATE(disp_pp(nodes_pp*ndim),vel_pp(nodes_pp*ndim),		&
-    acel_pp(nodes_pp*ndim),eld_pp(ntot,nels_pp))
+   ALLOCATE(disp_pp(nodes_pp*ndim),vel_pp(nodes_pp*ndim))
+   ALLOCATE(acel_pp(nodes_pp*ndim),eld_pp(ntot,nels_pp))
   END IF
-  disp_pp=zero; eld_pp=zero; vel_pp=zero; acel_pp=zero 		
+  
+  disp_pp  =  zero
+  eld_pp   =  zero
+  vel_pp   =  zero
+  acel_pp  =  zero 		
  
-  CALL gather(x1_pp(1:),eld_pp); disp_pp=zero
+  CALL gather(x1_pp(1:),eld_pp)
+  disp_pp  =  zero
   CALL scatter_nodes(npes,nn,nels_pp,g_num_pp,nod,ndim,nodes_pp,      	&
                          node_start,node_end,eld_pp,disp_pp,1)
   
-  CALL gather(d1x1_pp(1:),eld_pp); vel_pp=zero
+  CALL gather(d1x1_pp(1:),eld_pp)
+  vel_pp  =  zero
   CALL scatter_nodes(npes,nn,nels_pp,g_num_pp,nod,ndim,nodes_pp,      	&	
                          node_start,node_end,eld_pp,vel_pp,1) 
 
-  CALL gather(d2x1_pp(1:),eld_pp); acel_pp=zero
+  CALL gather(d2x1_pp(1:),eld_pp)
+  acel_pp  =  zero
   CALL scatter_nodes(npes,nn,nels_pp,g_num_pp,nod,ndim,nodes_pp,        &
                          node_start,node_end,eld_pp,acel_pp,1)
   timest(10)=elap_time()
-  !------------------ Sum values at Nodes --------------------------------!
-  ! Note the nodes are dsitributed in sequence
-  ! e.g. proc0:1-6  proc1:7-12 etc
+  
+!------------------------------------------------------------------------------
+! 13. Copy Data into global Array and copy out
+!------------------------------------------------------------------------------
 
   IF(.NOT.ALLOCATED(gDisp))THEN
    ALLOCATE(gDisp(nn*ndim),gVel(nn*ndim),gAcel(nn*ndim))
   ENDIF
-  gDisp=zero; gVel=zero; gAcel=zero
+  
+  gDisp  =  zero
+  gVel   =  zero
+  gAcel  =  zero
+  
   timest(11)=elap_time()
+  
   IF(npes.GT.1)THEN
-  ! Finding the offset of allocated nodes in processors
-  ! Does not need to be done every timestep but I have left this for now
-    nodesCount=zero; disps=zero; myCount = int(nodes_pp*ndim)
+  
+  ! Improvement : Does not need to be done every timestep
+    nodesCount	=  zero
+    disps		=  zero
+    myCount 	=  int(nodes_pp*ndim)
+    
     CALL MPI_ALLGATHER(myCount,1,MPI_INT,nodesCount,1,			&
 	MPI_INT,MPI_COMM_WORLD,ier)
+	
     disps(1)=0
     DO i=2,npes
        disps(i) = disps(i-1) + nodesCount(i-1)
     END DO
+    
     CALL MPI_ALLGATHERV(disp_pp,myCount,MPI_REAL8,gDisp,		&
 	nodesCount,disps,MPI_REAL8,MPI_COMM_WORLD,ier)
     CALL MPI_ALLGATHERV(vel_pp,myCount,MPI_REAL8,gVel,			&
 	nodesCount,disps,MPI_REAL8,MPI_COMM_WORLD,ier)
     CALL MPI_ALLGATHERV(acel_pp,myCount,MPI_REAL8,gAcel,		&
 	nodesCount,disps,MPI_REAL8,MPI_COMM_WORLD,ier)
-  ELSE
-    gDisp=disp_pp; gVel=vel_pp; gAcel=acel_pp
+  
+  ELSE ! Serial RUN 
+    gDisp  =  disp_pp
+    gVel   =  vel_pp
+    gAcel  =  acel_pp
   ENDIF
+  
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   timest(12)=elap_time()
 
-  ! NOTE disp_pp and vel_pp and acel_pp are the same format as d_OF_ etc
-  ! For Speed up remove the conversion to ptD
-  ! ptD and Global Disp are the same !!!
 
-  nodes_pp = nn; printres=0
+  nodes_pp  =  nn
+  printres  =  0
+  
   IF(.NOT.ALLOCATED(temp))THEN
    ALLOCATE(temp(nodes_pp),d1temp(nodes_pp),d2temp(nodes_pp))
    printres=1
   ENDIF
-  DO i=1,ndim; temp=zero; d1temp=zero; d2temp=zero
-    DO j=1,nodes_pp; k=i+(ndim*(j-1)); 
-      temp(j)=gDisp(k); d1temp(j)=gVel(k); d2temp(j)=gAcel(k)
+  
+  DO i=1,ndim
+   temp		=  zero
+   d1temp	=  zero
+   d2temp	=  zero
+   
+    DO j=1,nodes_pp
+      k			=  i+(ndim*(j-1)); 
+      temp(j)	=  gDisp(k)
+      d1temp(j)	=  gVel(k)
+      d2temp(j)	=  gAcel(k)
     END DO
+    
     DO k=1,nodes_pp;
-      ptD(i,k)=temp(k)
-      ptU(i,k)=d1temp(k)
-      ptA(i,k)=d2temp(k)
+      ptD(i,k)  =  temp(k)
+      ptU(i,k)  =  d1temp(k)
+      ptA(i,k)  =  d2temp(k)
     END DO
   END DO 
+  
   timest(13)=elap_time()
+  
+!------------------------------------------------------------------------------
+! 14. Print Runtime Information to File
+!------------------------------------------------------------------------------
 
-  !------ Print Information about Runtime to File -------
   IF(numpe==1 .AND. printres==1)THEN
   CALL system_mem_usage(RSS,VM)
   printres=0
   OPEN(10,FILE=argv(1:nlen)//".run",STATUS='REPLACE',ACTION='WRITE')
-   WRITE(10,'(A,F10.4)') "Time to load:",timest(3)-timest(2)
-   WRITE(10,'(A,F10.4)') "Time to Set ICs:",timest(5)-timest(4)
-   WRITE(10,'(A,F10.4)') "Time to Build RHS:",timest(7)-timest(5)
-   WRITE(10,'(A,F10.4)') "Time to Solve using PCG:",timest(8)-timest(7)
-   WRITE(10,'(A,F10.4)') "Time to Gather Data:",timest(10)-timest(9)
-   WRITE(10,'(A,F10.4)') "Time to Find Offsets:",timest(12)-timest(11)
-   WRITE(10,'(A,F10.4)') "Time to Copy data fields:",timest(13)-timest(12)
-   WRITE(10,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
-   WRITE(10,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
-   WRITE(10,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
-   WRITE(10,'(A,I10)') "Total Virtual Memory(Kb): ",VM
-   WRITE(10,'(A,I10)') "Total RSS Memory (Kb): ",RSS
-  CLOSE(10)
+    WRITE(10,'(A,F10.4)') "Time to load:",timest(3)-timest(2)
+    WRITE(10,'(A,F10.4)') "Time to Set ICs:",timest(5)-timest(4)
+    WRITE(10,'(A,F10.4)') "Time to Build RHS:",timest(7)-timest(5)
+    WRITE(10,'(A,F10.4)') "Time to Solve using PCG:",timest(8)-timest(7)
+    WRITE(10,'(A,F10.4)') "Time to Gather Data:",timest(10)-timest(9)
+    WRITE(10,'(A,F10.4)') "Time to Find Offsets:",timest(12)-timest(11)
+    WRITE(10,'(A,F10.4)') "Time to Copy data fields:",timest(13)-timest(12)
+    WRITE(10,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
+    WRITE(10,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
+    WRITE(10,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
+    WRITE(10,'(A,I10)') "Total Virtual Memory(Kb): ",VM
+    WRITE(10,'(A,I10)') "Total RSS Memory (Kb): ",RSS
+    CLOSE(10)
   END IF
   timest(11)=elap_time()
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
@@ -526,13 +843,16 @@
 
 
   SUBROUTINE checkforce(force,sense,node,solidPatchIDSize,nn)
+  !/****f*dyparafemsubroutines/checkforce
   !*  NAME
   !*    SUBROUTINE: checkforce
+  !*
   !*  SYNOPSIS
   !*    Usage:      checkforce_(force,sense,node_ensi,&solidPatchIDSize,&
   !*		    paraFemSolidDisp,&numPoints);                                 
+  !*
   !*  FUNCTION
-  !*    Prints the forces to mesh_ensi format  
+  !*    Prints the forces to file in ENSI GOLD format  
   !*
   !*  INPUTS
   !*    force(loaded_nodes*ndim): Mesh coordinates (stressMesh OpenFOAM)
@@ -540,6 +860,7 @@
   !* 	node(loaded_nodes*ndim)	: Node Numbers of loaded nodes
   !*   	solidPatchIDSize	: Size of boundary Mesh	
   !*    nn			: # of Nodes  			
+  !*
   !*  OUTPUTS:
   !*	Writes to file "argv".ensi.NDLDS
   !*	Contains information about loads on nodes
