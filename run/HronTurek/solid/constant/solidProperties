@@ -1,0 +1,42 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidSolver DyParaFEMSolid;
+
+DyParaFEMSolidCoeffs
+{
+
+    nonLinear off;   // Not required for ParaFEM
+  
+    moveMesh yes;
+
+    gravity 0.0;
+
+    alpha1 0;
+    beta1 0;
+    theta 1.0;
+
+    rbfUpdate false;
+
+    timeStep 0.001;
+}
+
+
+
+
+
+
+// ************************************************************************* //
