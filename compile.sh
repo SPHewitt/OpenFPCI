@@ -60,7 +60,7 @@ cd  src
 ./parafem.sh
 
 # Run the OpenFPCI Compile Script
-./openfpci
+./openfpci.sh
 
 
 

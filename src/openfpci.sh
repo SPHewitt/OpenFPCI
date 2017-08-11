@@ -10,9 +10,6 @@
 #
 # 1. Check that parafem is installed 
 #
-#
-#
-
 
 version=$(grep "^#?"  "$0" | cut -c 4-)
 
@@ -143,7 +140,8 @@ cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src
 
 # Corrections to the Fuid Structure Interaction library
 # Foam Extend 4.0 Updated the fluxRequired methods
-
+echo "Corrections ot the FSI Library"
+echo "Corrections to the FSI Library" >> $logfile
 cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/fluidSolvers/
 sed -i '/setRefCell/a \ \ \ \ mesh.schemesDict().setFluxRequired(p_.name());' icoFluid/icoFluid.C
 sed -i '/setRefCell/a \ \ \ \ mesh.schemesDict().setFluxRequired(p().name());' consistentIcoFluid/consistentIcoFluid.C
@@ -206,19 +204,4 @@ echo "End of OpenFPCI compilation" >> $logfile
 ##################
 # OpenFPCI Testing 
 ##################
-
-cd $WORKING_DIR
-
-# Copy Hron Turek test Case to user run folder
-
-cp -r HronTurek $FOAM_RUN/. 
-
-cd $FOAM_RUN/HronTurek/fluid
-
-./Allrun
-
-
-
-
-
 

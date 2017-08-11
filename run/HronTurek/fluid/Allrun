@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Source Foam bashrc
+source $HOME/foam/foam-extend-4.0/etc/bashrc
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
