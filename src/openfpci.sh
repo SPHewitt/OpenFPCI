@@ -139,7 +139,14 @@ fi
 echo "Fsi compilation"
 echo "Fsi compilation" >> $logfile
 cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src
-./Allwmake >> $logfile 2>&1  
+./Allwmake >> $logfile 2>&1
+
+# Corrections to the Fuid Structure Interaction library
+# Foam Extend 4.0 Updated the fluxRequired methods
+
+cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/fluidSolvers/
+sed -i '/setRefCell/a \ \ \ \ mesh.schemesDict().setFluxRequired(p_.name());' icoFluid/icoFluid.C
+sed -i '/setRefCell/a \ \ \ \ mesh.schemesDict().setFluxRequired(p().name());' consistentIcoFluid/consistentIcoFluid.C
 
 #######################################
 # OpenFPCI compilation and installation
