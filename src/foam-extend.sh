@@ -144,8 +144,8 @@ else
 fi
 
 # Add alias to bashrc file
-echo "Adding alias \"fe40\"to bashrc to source foam-extend"
-echo "Adding alias \"fe40\"to bashrc to source foam-extend" >> $logfile
+echo "Adding alias \"fe40\"to bashrc"
+echo "Adding alias \"fe40\"to bashrc">> $logfile
 echo "alias fe40='source \$HOME/foam/foam-extend-4.0/etc/bashrc'" >> $HOME/.bashrc
 
 # Run foam-extend test and tutorials
