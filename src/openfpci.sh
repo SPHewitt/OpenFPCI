@@ -149,11 +149,11 @@ echo "OpenFPCI compilation"
 echo "OpenFPCI compilation" >> $logfile
 
 cd $WORKING_DIR
-if [ ! -d OpenFPCI ]; then
-    git clone git://github.com/SPHewitt/OpenFPCI.git
-fi
+#if [ ! -d OpenFPCI ]; then
+#    git clone git://github.com/SPHewitt/OpenFPCI.git
+#fi
 
-cp -r OpenFPCI/paraFEM $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/solidSolvers/
+cp -r paraFEM $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/solidSolvers/
 
 cd  $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/solidSolvers
 
@@ -167,10 +167,9 @@ cat paraFEM.files $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInter
 mv tmp.files $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/Make/files
     
 # Modify the options files
+#sed -i 's/EXE_INC = -std=c++11 \\/EXE_INC = -std=c++11 \\\n  '"${OPENMPI_COMPILE_FLAGS//\//\\/}"'\\/' $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/Make/options
 
-sed -i 's/EXE_INC = -std=c++11 \\/EXE_INC = -std=c++11 \\\n  '"${OPENMPI_COMPILE_FLAGS//\//\\/}"'\\/' $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/Make/options
-
-sed -i 's/EXE_LIBS = /EXE_LIBS = \\\n    '"${WM_PROJECT_USER_DIR//\//\\/}"'\/FluidSolidInteraction\/src\/fluidSolidInteraction\/solidSolvers\/paraFEM\/dyparafemsubroutines.o \\\n    -L\/'"${PARAFEM_DIR//\//\\/}"'\/lib -lParaFEM_mpi.5.0.3  -L\/'"${PARAFEM_DIR//\//\\/}"'\/lib -larpack_linuxdesktop -lgfortran \\\n    '"${OPENMPI_LINK_FLAGS//\//\\/}"'/'  $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/Make/options
+#sed -i 's/EXE_LIBS = /EXE_LIBS = \\\n    '"${WM_PROJECT_USER_DIR//\//\\/}"'\/FluidSolidInteraction\/src\/fluidSolidInteraction\/solidSolvers\/paraFEM\/dyparafemsubroutines.o \\\n    -L\/'"${PARAFEM_DIR//\//\\/}"'\/lib -lParaFEM_mpi.5.0.3  -L\/'"${PARAFEM_DIR//\//\\/}"'\/lib -larpack_linuxdesktop -lgfortran \\\n    '"${OPENMPI_LINK_FLAGS//\//\\/}"'/'  $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/fluidSolidInteraction/Make/options
 
 sed -i 's/EXE_INC = -std=c++11 \\/EXE_INC = -std=c++11 \\\n  '"${OPENMPI_COMPILE_FLAGS//\//\\/}"'\\/' $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/solvers/fsiFoam/Make/options
 
@@ -185,12 +184,12 @@ cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/
 # Fixed some dependencies as indicated in the wiki to run the tutorial (not tested!)
 # https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-structure_interaction#Install_on_foam-extend-4.0
 
-#cd ..
-#find run -name options | while read item
-#do
-#  sed -i -e 's=$(WM_PROJECT_DIR)/applications/solvers/FSI=$(WM_PROJECT_USER_DIR)/FluidSolidInteractio#n/src=' $item
-#  sed -i -e 's=$(WM_THIRD_PARTY_DIR)/packages/eigen3=$(WM_PROJECT_USER_DIR)/FluidSolidInteraction/src#/ThirdParty/eigen3=' $item
-#done
+cd ..
+find run -name options | while read item
+do
+  sed -i -e 's=$(WM_PROJECT_DIR)/applications/solvers/FSI=$(WM_PROJECT_USER_DIR)/FluidSolidInteractio#n/src=' $item
+  sed -i -e 's=$(WM_THIRD_PARTY_DIR)/packages/eigen3=$(WM_PROJECT_USER_DIR)/FluidSolidInteraction/src#/ThirdParty/eigen3=' $item
+done
 
 cd $WORKING_DIR
 
