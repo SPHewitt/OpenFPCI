@@ -26,7 +26,9 @@ Class
     DyParaFEMSolid
 
 Description
-
+   The DyParaFEMSolid solver is a wrapper to integrate the paraFEM fortran
+   routines into Foam-Extend. The routines solve the deformation for a
+   linear elastic solid.
 
 Authors
     Sam Hewitt, University of Manchester.
