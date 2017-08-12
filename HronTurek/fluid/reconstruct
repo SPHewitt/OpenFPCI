@@ -1,5 +1,0 @@
-#!/bin/sh
-
-#reconstruct fluid domain
-reconstructPar -region solid
-reconstructPar
