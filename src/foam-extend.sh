@@ -118,10 +118,11 @@ if [ ! -d foam-extend-$FOAMEXTEND_VERSION ]; then
 
     #Use MPI from system
     sed -i 's/#export WM_MPLIB=SYSTEMOPENMPI/export WM_MPLIB=SYSTEMOPENMPI/' $PREFSFILE
-    sed -i 's/#export OPENMPI_LIB_DIR="`$OPENMPI_BIN_DIR/mpicc --showme:libdirs`"/export OPENMPI_LIB_DIR="`$OPENMPI_BIN_DIR/mpicc --showme:libdirs`"' $PREFSFILE
-    sed -i 's/#export OPENMPI_INCLUDE_DIR="`$OPENMPI_BIN_DIR/mpicc --showme:incdirs`"/export OPENMPI_INCLUDE_DIR="`$OPENMPI_BIN_DIR/mpicc --showme:incdirs`"' $PREFSFILE
-    sed -i 's/#export OPENMPI_COMPILE_FLAGS="`$OPENMPI_BIN_DIR/mpicc --showme:compile`"/export OPENMPI_COMPILE_FLAGS="`$OPENMPI_BIN_DIR/mpicc --showme:compile`"' $PREFSFILE
-    sed -i 's/#export OPENMPI_LINK_FLAGS="`$OPENMPI_BIN_DIR/mpicc --showme:link`"/export OPENMPI_LINK_FLAGS="`$OPENMPI_BIN_DIR/mpicc --showme:link`"' $PREFSFILE
+
+    sed -i 's/#export OPENMPI_LIB_DIR="`$OPENMPI_BIN_DIR\/mpicc --showme:libdirs`"/export OPENMPI_LIB_DIR="`$OPENMPI_BIN_DIR\/mpicc --showme:libdirs`"/' $PREFSFILE
+    sed -i 's/#export OPENMPI_INCLUDE_DIR="`$OPENMPI_BIN_DIR\/mpicc --showme:incdirs`"/export OPENMPI_INCLUDE_DIR="`$OPENMPI_BIN_DIR\/mpicc --showme:incdirs`"/' $PREFSFILE
+    sed -i 's/#export OPENMPI_COMPILE_FLAGS="`$OPENMPI_BIN_DIR\/mpicc --showme:compile`"/export OPENMPI_COMPILE_FLAGS="`$OPENMPI_BIN_DIR\/mpicc --showme:compile`"/' $PREFSFILE
+    sed -i 's/#export OPENMPI_LINK_FLAGS="`$OPENMPI_BIN_DIR\/mpicc --showme:link`"/export OPENMPI_LINK_FLAGS="`$OPENMPI_BIN_DIR\/mpicc --showme:link`"/' $PREFSFILE
 
 #    sed -i 's/#export OPENMPI_DIR=path_to_system_installed_openmpi/export OPENMPI_DIR=\/usr/' $PREFSFILE
 #    sed -i 's/#export OPENMPI_BIN_DIR=$OPENMPI_DIR\/bin/export OPENMPI_BIN_DIR=$OPENMPI_DIR\/bin/' $PREFSFILE
