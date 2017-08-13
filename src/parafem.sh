@@ -94,6 +94,15 @@ else
     svn update >> $logfile 2>&1  
 fi
 
+
+cd $HOME/parafem-code/parafem/build
+
+# Alter mpif90 definition in build/linuxdesktop
+sed -i 's/FC=\/usr\/bin\/mpif90/FC=mpif90/' linuxdesktop.inc 
+
+
+cd $HOME/parafem-code/parafem
+
 # Compilation for linuxdesktop
 MACHINE=linuxdesktop ./make-parafem >> $logfile 2>&1   
 
