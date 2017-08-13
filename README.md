@@ -35,8 +35,8 @@ The FSI Library does not currently compile with gcc >= 6 so be careful when load
 
 Prerequisites:
 
-* OpenMPI: Version 1.6.5 and 1.8.8 have been tested.
-* GCC compilers: gcc 4.x to 5.x have been tested.
+* OpenMPI: Version 1.6.5  has been tested.
+* GCC compilers: gcc 4.x  have been tested.
 
 ```
 cd OpenFPCI
@@ -46,22 +46,20 @@ cd OpenFPCI
 
 ### Manchester Computational Facility
 
-Prerequisites:
-
-```
-module load compilers/gcc/4.9.0
-
-module load mpi/gcc/openmpi/1.6-ib
-```
+Instructuctions to be updated soon.
 
 ### SGI - N8 Polaris (Leeds)
 
-Prerequisites:
+The application has been tested with gnu/4.9.1 package and system openmpi version 1.6.5. The default compilers on the system are intel so these need to be swapped for the gnu compilers. The intel compilers can be used however instructions for this are not yet available.
 
 ```
-module swap intel/"version" gnu/5.0.3
+module swap intel/"version" gnu/4.9.1
 
 module load openmpi/1.6.5
+
+cd OpenFPCI
+
+./compile.sh
 ```
 
 ### XC30 -  Archer (Edinburgh)
