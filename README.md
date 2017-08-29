@@ -22,7 +22,7 @@ FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-str
 git clone https://github.com/SPHewitt/OpenFPCI
 ```
 
-This repository contatins the files that couple OpenFOAM to ParaFEM. The scripts avialable in the build directory can be used to install Foam-Extend ParaFEM and OpenFPCI.
+This repository contatins the files that couple OpenFOAM to ParaFEM. The scripts available in the build directory can be used to install Foam-Extend ParaFEM and OpenFPCI.
 
 The software installation has been tested on a number of systems, a linux desktop (Ubuntu 16.04), The Computational Shared Facility at Manchester and the SGI system in Leeds (Polaris). The instructions for these are as follows. The Scripts use the sytem compilers and mpi packages, so correct modules and packages need to be loaded and installed. 
 
