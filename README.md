@@ -16,6 +16,8 @@ Foam-Extend: https://openfoamwiki.net/index.php/Installation/Linux/foam-extend-4
 
 FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-structure_interaction
 
+The scripts to install these packages can be found in the src folder after dowloading the application, with instructions for this detailed below.
+
 ### Downloading the Code
 
 ```
