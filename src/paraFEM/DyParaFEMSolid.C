@@ -32,6 +32,7 @@ License
 #include "multiMaterial.H"
 #include "twoDPointCorrector.H"
 #include "fixedValuePointPatchFields.H"
+#include "emptyPointPatchFields.H"
 #include "RBFInterpolation.H"
 #include "TPSFunction.H"
 #include "ZoneIDs.H"
@@ -483,8 +484,10 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         
         if 
 	(
-            (mesh.boundary()[patchI].type() == "empty") || 
-	    (mesh.boundary()[patchI].type() == "symmetryPlane")
+            isA<emptyPointPatchVectorField>
+            (
+                pointD_.boundaryField()[patchI]
+            )
 	)
 	{
 	    numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
@@ -500,13 +503,18 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 //  ParaFEM: Boundary Conditions 
 //------------------------------------------------------------------------------
 
+    int counter = 0;    
+
     forAll(pointD_.boundaryField(), patchI)
     {
 
 	// ------ Fixed Z ------
 	if 
 	(
-            (mesh.boundary()[patchI].type() == "empty")
+            isA<emptyPointPatchVectorField>
+            (
+                pointD_.boundaryField()[patchI]
+            )
 	)
 	{
 	    const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
@@ -527,7 +535,8 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 		    myList[1]  =  1;
 		    myList[2]  =  1;
 		    myList[3]  =  0;
-	            localRest[mp[pI]] =  myList;
+	            localRest[counter] =  myList;
+                    counter++;
 		}
 	    }  
 	}
@@ -558,7 +567,8 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 	        myList[1]  =  0;
 	        myList[2]  =  0;
 	        myList[3]  =  0;
-                localRest[mp[pI]] =  myList;
+                localRest[counter] =  myList;
+                counter++;
 	    }	
 	}
     }
