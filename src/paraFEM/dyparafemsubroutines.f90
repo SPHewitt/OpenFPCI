@@ -23,29 +23,30 @@
   !*	linear elastic solid.
   !* 	
   !*    
-  !*    SUBROUTINE          PURPOSE
+  !*  SUBROUTINE            PURPOSE
   !*
-  !*    initparafem:		Generates Initial Matricies and arrays
-  !*	finddiagprecon:		Finds Diagonal Preconditioner
-  !*	runparafem:		Solves the governing equations  	
-  !*	checkparafem 		Write Mesh and geometry to file (ensi)
-  !*	forcecheck 		Write the loads to file (ensi)
-  !*	of2sg 			OpenFOAM to Smith Griffiths format
-  !*	gloads			Gravity Loading
-  !*	writeToFile		Writes float field to file(debugging)
-  !*	writeToFileInt		Writes int field to file(debugging)
-  !*	system_mem_usage	Obtains the RSS and VM at call
+  !*    initparafem:		      Generates Initial Matricies and arrays
+  !*    finddiagprecon:	    Finds Diagonal Preconditioner
+  !*	  runparafem:		      Solves the governing equations  	
+  !*	  checkparafem 		    Write Mesh and geometry to file (ensi)
+  !*	  forcecheck 		      Write the loads to file (ensi)
+  !*	  of2sg 			          OpenFOAM to Smith Griffiths format
+  !*	  gloads			          Gravity Loading
+  !*	  writeToFile		      Writes float field to file(debugging)
+  !*	  writeToFileInt		    Writes int field to file(debugging)
+  !*	  system_mem_usage	    Track Memory usage
+  !*    populate_g_coord_pp2 Populate g_coord_pp array
   !*		 
   !*	
-  !*    FUNCTION          	PURPOSE
+  !*  FUNCTION         	PURPOSE
   !* 
-  !*	findnelspp		Returns nels_pp to c++
-  !*	findneqpp		Returns neq_pp to c++
+  !*	findnelspp		    Returns nels_pp to c++
+  !*	findneqpp		      Returns neq_pp to c++
   !*
   !*  AUTHORS
   !* 	S.Hewitt
   !*  COPYRIGHT
-  !*    (c) University of Manchester 1996-2014
+  !*    (c) University of Manchester 1996-2017
   !******
   !*/
 
@@ -59,24 +60,24 @@
   !*    SUBROUTINE: initparafem
   !*
   !*  SYNOPSIS
-  !*    Usage:      initparafem_(MeshData,g_num_OF,rest,&numPoints,	&
-  !*			&numCells,&nr,&e,&pois,steerG,stiff);   
+  !*    Usage:  initparafem_(MeshData,g_num_OF,rest,&numPoints,	&
+  !*			          &numCells,&nr,&e,&pois,steerG,stiff);   
   !*            
   !*  FUNCTION
   !*    Initialises ParaFEM, calculating the stiffness matirx [k], 
-  !*	Mass Matrix [M] and steering matrix (g_g_pp).
+  !*	  Mass Matrix [M] and steering matrix (g_g_pp).
   !*
   !*  INPUTS
-  !*    g_coord(ndim,nn)		: Mesh coordinates (stressMesh OpenFOAM)		
-  !*	g_num_pp(nod,nels_pp)	: Steering Matrix (OF Format) 				
-  !*	rest(nr,nodof+1)		: Restrained Nodes example:(node# 0 0 0)
-  !* 	nn						: # of Nodes
-  !*	nels					: # of elements
-  !*	nr 						: # of restrained Nodes
-  !*    sProp					: Solid Properties (e v rho) 	 
+  !*    g_coord(ndim,nn)		  : Mesh coordinates (stressMesh OpenFOAM)		
+  !*	  g_num_pp(nod,nels_pp)	: Steering Matrix (OF Format) 				
+  !*	  rest(nr,nodof+1)		  : Restrained Nodes example:(node# x y z)
+  !* 	  nn						        : # of Nodes
+  !*	  nels					        : # of elements
+  !*	  nr 						        : # of restrained Nodes
+  !*    sProp					        : Solid Properties (e v rho) 	 
   !*	  			
   !*  OUTPUTS:
-  !*   	g_g_pp(ntot,nels_pp)			: Global Steering Matrix
+  !*    g_g_pp(ntot,nels_pp)			      : Global Steering Matrix
   !*   	store_km_pp(ntot,ntot,nels_pp)	: Stiffness Matrix [k]
   !*   	store_mm_pp(ntot,ntot,nels_pp)	: Mass Matrix [M]
 
@@ -88,10 +89,10 @@
   !*    neq,ntot are now global variables - must not be declared
   !* --------------------------------------------------------------------
 
-  USE mpi_wrapper;	USE precision; 	USE global_variables; 
-  USE mp_interface;	USE input;	USE output; 
-  USE loading; 		USE timing; 	USE maths; 
-  USE gather_scatter;	USE steering; 	USE new_library;
+  USE mpi_wrapper;    USE precision;  USE global_variables; 
+  USE mp_interface;	  USE input;      USE output; 
+  USE loading;        USE timing;     USE maths; 
+  USE gather_scatter; USE steering;   USE new_library;
 
   IMPLICIT NONE
 
@@ -99,30 +100,30 @@
 ! 1. Declare variables
 !------------------------------------------------------------------------------
 
-  INTEGER,PARAMETER		::nodof=3,ndim=3,nst=6,nod=8
-  REAL(iwp),PARAMETER		::zero=0.0_iwp
+  INTEGER,PARAMETER		    ::nodof=3,ndim=3,nst=6,nod=8
+  REAL(iwp),PARAMETER		  ::zero=0.0_iwp
 
-  INTEGER,INTENT(IN) 		::nels,nn
+  INTEGER,INTENT(IN) 		  ::nels,nn
 
   INTEGER,INTENT(INOUT)		::g_g_pp(ndim*nod,nels_pp),rest(nr,nodof+1)
   INTEGER,INTENT(INOUT)		::g_num_pp(nod,nels_pp)
 
-  INTEGER			::iel,i,j,k,l,m,n,nr,nip,ndof,npes_pp,nlen
-  INTEGER			::partitioner,printres,RSS,VM,RSSa,VMa
+  INTEGER                 ::iel,i,j,k,l,m,n,nr,nip,ndof,npes_pp,nlen
+  INTEGER			            ::partitioner,printres,RSS,VM,RSSa,VMa
 
   REAL(iwp),INTENT(INOUT)	::g_coord(ndim,nn),sProp(3)
   REAL(iwp),INTENT(INOUT)	::store_km_pp(ndim*nod,ndim*nod,nels_pp)
   REAL(iwp),INTENT(INOUT)	::store_mm_pp(ndim*nod,ndim*nod,nels_pp)
 
-  REAL(iwp)			::det,period,volume,tol,e,v,rho	
+  REAL(iwp)			          ::det,period,volume,tol,e,v,rho	
 
-  LOGICAL			::converged=.false.
-  LOGICAL			::consistent=.TRUE.
-  LOGICAL			::initialised	
+  LOGICAL			            ::converged=.false.
+  LOGICAL			            ::consistent=.TRUE.
+  LOGICAL			            ::initialised	
 
-  CHARACTER(LEN=50)		::argv
-  CHARACTER(LEN=15)		::element
-  CHARACTER(LEN=6) 		::ch
+  CHARACTER(LEN=50)		    ::argv
+  CHARACTER(LEN=15)		    ::element
+  CHARACTER(LEN=6) 		    ::ch
   CHARACTER(LEN=1024) 		::filename  
 
 !------------------------------------------------------------------------------
@@ -133,9 +134,9 @@
   REAL(iwp),ALLOCATABLE		::jac(:,:),der(:,:),deriv(:,:),bee(:,:)
   REAL(iwp),ALLOCATABLE		::fun(:),emm(:,:),ecm(:,:),g_coord_pp(:,:,:)
 
-  INTEGER,ALLOCATABLE		::node(:),localcount(:),readcount(:)
+  INTEGER,ALLOCATABLE		  ::node(:),localcount(:),readcount(:)
  
- CALL system_mem_usage(RSSa,VMa)
+  CALL system_mem_usage(RSSa,VMa)
  
 !------------------------------------------------------------------------------
 ! 3. Input and Initialisation
@@ -148,7 +149,7 @@
   e=sProp(1);v=sProp(2);rho=sProp(3);
 
   ALLOCATE(timest(20))
-  timest	=  zero
+  timest	  =  zero
   timest(1)	=  elap_time()
 
   ! Test for MPI Initialisation
@@ -171,16 +172,11 @@
   ! Calculate iel_start
   CALL setielstart() 
 
-
-  ! PRINT*,numpe,iel_start
-
-
   ! Degrees of Freedon per Element
   ndof  =  nod*nodof
   ntot  =  ndof;
-  
-
-!------------------------------------------------------------------------------
+ 
+ !------------------------------------------------------------------------------
 ! 4. Populate g_coord_pp and g_num_pp
 !------------------------------------------------------------------------------ 
   timest(2)=elap_time();
@@ -210,8 +206,6 @@
   ALLOCATE(der(ndim,nod),deriv(ndim,nod),bee(nst,ntot))
   ALLOCATE(weights(nip),ecm(ntot,ntot),emm(ntot,ntot),fun(nod))
 
-  timest(4)=elap_time()
-
   ! Rearrange the rest Array
   CALL rearrange(rest)
 
@@ -221,7 +215,7 @@
   
   ! Find the global Steering Matrix
   elements_0: DO iel=1,nels_pp
-  ! CALL find_g(g_num_pp(:,iel),g_g_pp(:,iel),rest)
+  ! CALL find_g(g_num_pp(:,iel),g_g_pp(:,iel),rest) // Stable but slow
     CALL find_g3(g_num_pp(:,iel),g_g_pp(:,iel),rest)
   END DO elements_0
   
@@ -232,13 +226,11 @@
   CALL calc_npes_pp(npes,npes_pp)
   CALL make_ggl(npes_pp,npes,g_g_pp)
   
-  timest(6)=elap_time()	
+  timest(4)=elap_time()	
 
 !------------------------------------------------------------------------------
 ! 5. Element Stiffness and Mass Integration
 !------------------------------------------------------------------------------ 
-
-  timest(7)=elap_time()	
   
   ! [D] : Stress-Strain Matrix
   dee  =  zero 
@@ -295,28 +287,30 @@
     store_mm_pp(:,:,iel)  =  emm
   END DO elements_2  
   
-  timest(8)=elap_time()	
+  timest(5)=elap_time()	
   
 !------------------------------------------------------------------------------
 ! 6. Print Information about Runtime to File
 !------------------------------------------------------------------------------ 
+  ! Manual Switch to turn on/off .res file
   printres  =  1
   
   IF(numpe==1 .AND. printres==1)THEN
   CALL system_mem_usage(RSS,VM)
   OPEN(11,FILE=argv(1:nlen)//".res",STATUS='REPLACE',ACTION='WRITE')
-   WRITE(11,'(A,I7,A)') "This job ran on ",npes," processes"
-   WRITE(11,'(A,3(I12,A))') "There are ",nn," nodes", nr, &
-                           " restrained and ",neq," equations"
-   WRITE(11,'(A,F10.4)') "Time to Populate g_coord/num_pp is:",timest(3)-timest(2)
-   WRITE(11,'(A,F10.4)') "Time to find_g:",timest(5)-timest(4)
-   WRITE(11,'(A,F10.4)') "Time to make_ggl:",timest(6)-timest(5)
-   WRITE(11,'(A,F10.4)') "Time to Build K and M:",timest(8)-timest(7)
-   WRITE(11,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
-   WRITE(11,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
-   WRITE(11,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
-   WRITE(11,'(A,I10)') "Total Virtual Memory(Kb): ",VM
-   WRITE(11,'(A,I10)') "Total RSS Memory (Kb): ",RSS
+    WRITE(11,'(A,I7,A)') "This job ran on ",npes," processes"
+    WRITE(11,'(A,3(I12,A))') "There are ",nn," nodes", nr, &
+                            " restrained and ",neq," equations"
+    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
+    WRITE(11,'(A,F10.4)') "Time to Populate g_coord/num_pp is:",timest(3)-timest(2)
+    WRITE(11,'(A,F10.4)') "Time to find_g & make_ggl:",timest(4)-timest(3)
+    WRITE(11,'(A,F10.4)') "Time to Build K and M:",timest(5)-timest(4)
+    WRITE(11,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
+    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
+    WRITE(11,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
+    WRITE(11,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
+    WRITE(11,'(A,I10)') "Total Virtual Memory(Kb): ",VM
+    WRITE(11,'(A,I10)') "Total RSS Memory (Kb): ",RSS
   CLOSE(11)
   END IF
   
@@ -353,9 +347,9 @@
   !*/
   !* -------------------------------------------------------------------
   
-  USE mpi_wrapper;	USE precision;	USE global_variables; 
-  USE mp_interface; 	USE input;	USE output; 
-  USE loading; 		USE timing; 	USE maths; 
+  USE mpi_wrapper;	  USE precision;	USE global_variables; 
+  USE mp_interface; 	USE input;	    USE output; 
+  USE loading; 		    USE timing; 	  USE maths; 
   USE gather_scatter;	USE steering; 	USE new_library; 
   
   IMPLICIT NONE
@@ -364,10 +358,10 @@
 ! 1. Declare variables used in the main program
 !------------------------------------------------------------------------------
 
-  INTEGER,PARAMETER		::nodof=3,ndim=3,nst=6
-  REAL(iwp),PARAMETER		::zero=0.0_iwp
+  INTEGER,PARAMETER		    ::nodof=3,ndim=3,nst=6
+  REAL(iwp),PARAMETER		  ::zero=0.0_iwp
   
-  INTEGER			::i,j,k,iel,ndof
+  INTEGER			            ::i,j,k,iel,ndof
 
   REAL(iwp),INTENT(IN)		::store_km_pp(ndim*8,ndim*8,nels_pp)
   REAL(iwp),INTENT(IN)		::store_mm_pp(ndim*8,ndim*8,nels_pp)
@@ -375,8 +369,8 @@
   
   REAL(iwp),INTENT(INOUT)	::diag_precon_pp(neq_pp)
   
-  REAL(iwp)			::tmp(neq_pp),alpha1,beta1,theta
-  REAL(iwp)			::dtim,c3,c4
+  REAL(iwp)			          ::alpha1,beta1,theta
+  REAL(iwp)			          ::dtim,c3,c4
   
   REAL(iwp),ALLOCATABLE		::timest(:),diag_precon_tmp(:,:)
   
@@ -385,10 +379,9 @@
   beta1   =  numVar(2)
   theta   =  numVar(3)
   dtim	  =  numVar(4)
-  c3	  =  alpha1+1._iwp/(theta*dtim)
-  c4	  =  beta1+theta*dtim
+  c3	    =  alpha1+1._iwp/(theta*dtim)
+  c4	    =  beta1+theta*dtim
   ndof    =  ntot
-  
   
 !------------------------------------------------------------------------------ 
 ! 2. Calculate Diagonal preconditioner
@@ -431,34 +424,34 @@
   !*    Solve the governing equations and output the results 
   !*
   !*  INPUTS
-  !*	numVar				: (alpha1 beta1 theta dtim)
-  !*	val(ndim,loaded_nodes)		: Force vector of loaded nodes
-  !*   	node(loaded_nodes)		: Node # of loaded_nodes
-  !*	loaded_nodes			: # of loaded nodes			  
-  !*    g_g_pp(ntot,els)		: Global Steering Matrix
-  !*	g_num_pp(nod,nels)		: Steering Matrix
-  !*    storkm_pp(ntot,ntot,nels_pp)	: Stiffness Matrix [k]
-  !*    stormm_pp(ntot,ntot,nels_pp)	: Mass Matrix [M]
-  !*	diag_precon_pp(neq_pp)		: Diagonal Preconditioner	
-  !*	gravlo(neq_pp)			: vector of gravity loads		
+  !*	  numVar				                  : (alpha1 beta1 theta dtim)
+  !*	  val(ndim,loaded_nodes)		      : Force vector of loaded nodes
+  !*   	node(loaded_nodes)		          : Node # of loaded_nodes
+  !*  	loaded_nodes			              : # of loaded nodes		  
+  !*  	Time			                      : Current time
+  !*    nodes_pp                        : # of nodes per cores
+  !*    g_g_pp(ntot,els)		            : Global Steering Matrix
+  !*	  g_num_pp(nod,nels)		          : Steering Matrix
+  !*    storkm_pp(ntot,ntot,nels_pp)	  : Stiffness Matrix [k]
+  !*    stormm_pp(ntot,ntot,nels_pp)	  : Mass Matrix [M]
+  !*	  diag_precon_pp(neq_pp)		      : Diagonal Preconditioner	
+  !*	  gravlo(neq_pp)			            : vector of gravity loads	
   !*				
-  !*  OUTPUTS:
-  !*  	Dfield(ntot,nels_pp)		: Nodal displacements
-  !*  	Ufield(ntot,nels_pp)		: Nodal velocities
-  !*  	Afield(ntot,nels_pp)		: Nodal accelerations
+  !*  INPUTS/OUTPUTS:
+  !*  	Dfield(ntot,nels_pp)		        : Nodal displacements
+  !*  	Ufield(ntot,nels_pp)		        : Nodal velocities
+  !*  	Afield(ntot,nels_pp)		        : Nodal accelerations
   !* 				
-  !*  AUTHORS
+  !*  AUTHOR
   !*    S. Hewitt
-  !*	
-  !*  COMMENT: Total Force will not be same as that in OpenFOAM as it
-  !*		Excludes the force vectors on the restrained nodes.		
+  !*		
   !*/
   !* -------------------------------------------------------------------!
   
     
-  USE mpi_wrapper;	USE precision;	USE global_variables; 
-  USE mp_interface; 	USE input;	USE output; 
-  USE loading; 		USE timing; 	USE maths; 
+  USE mpi_wrapper;	  USE precision;	USE global_variables; 
+  USE mp_interface; 	USE input;	    USE output; 
+  USE loading; 		    USE timing; 	  USE maths; 
   USE gather_scatter;	USE steering; 	USE new_library; 
   
   IMPLICIT NONE
@@ -467,35 +460,35 @@
 ! 1. Declare variables used in the main program
 !------------------------------------------------------------------------------
 
-  INTEGER,PARAMETER		::nodof=3,ndim=3,nst=6,nod=8
-  REAL(iwp),PARAMETER		::zero=0.0_iwp,one=1.0_iwp
+  INTEGER,PARAMETER		      ::nodof=3,ndim=3,nst=6,nod=8
+  REAL(iwp),PARAMETER		    ::zero=0.0_iwp,one=1.0_iwp
   
-  INTEGER,INTENT(INOUT)		::loaded_nodes,node(loaded_nodes)
-  INTEGER,INTENT(INOUT)		::g_num_pp(nod,nels_pp),nodes_pp
-  INTEGER,INTENT(INOUT)		::g_g_pp(ntot,nels_pp)
+  INTEGER,INTENT(INOUT)		  ::loaded_nodes,node(loaded_nodes)
+  INTEGER,INTENT(INOUT)		  ::g_num_pp(nod,nels_pp),nodes_pp
+  INTEGER,INTENT(INOUT)		  ::g_g_pp(ntot,nels_pp)
   
-  INTEGER			::iel,i,j,k,l,m,n,iters,printres
-  INTEGER			::limit,nels,node_end,node_start
-  INTEGER			::nlen,myCount,disps(npes),flag
-  INTEGER			::nodesCount(npes),RSS,VM,RSSa,VMa  
+  INTEGER			              ::iel,i,j,k,l,m,n,iters,printres
+  INTEGER			              ::limit,nels,node_end,node_start
+  INTEGER			              ::nlen,myCount,disps(npes),flag
+  INTEGER			              ::nodesCount(npes),RSS,VM,RSSa,VMa  
 
   REAL(iwp),INTENT(INOUT) 	::diag_precon_pp(neq_pp)
   REAL(iwp),INTENT(INOUT) 	::store_km_pp(ntot,ntot,nels_pp)
   REAL(iwp),INTENT(INOUT) 	::store_mm_pp(ntot,ntot,nels_pp)
   REAL(iwp),INTENT(INOUT) 	::numVar(4),time,gravlo(neq_pp)
   REAL(iwp),INTENT(INOUT) 	::val(ndim,loaded_nodes)
-  REAL(iwp),INTENT(INOUT)       ::Dfield(ntot,nels_pp),Ufield(ntot,nels_pp)
-  REAL(iwp),INTENT(INOUT)       ::Afield(ntot,nels_pp)
+  REAL(iwp),INTENT(INOUT)   ::Dfield(ntot,nels_pp),Ufield(ntot,nels_pp)
+  REAL(iwp),INTENT(INOUT)   ::Afield(ntot,nels_pp)
   
-  REAL(iwp)			::tol,up,alpha,beta,alpha1,beta1,theta,dtim
-  REAL(iwp)			::c1,c2,c3,c4,val_2D(ndim,loaded_nodes)
-  REAL(iwp)			::X,Y,Z
+  REAL(iwp)			            ::tol,up,alpha,beta,alpha1,beta1,theta,dtim
+  REAL(iwp)			            ::c1,c2,c3,c4
+  REAL(iwp)			            ::X,Y,Z
   
-  LOGICAL			::converged,debug
-  CHARACTER(LEN=50)		::argv
-  CHARACTER(LEN=15)		::element;
-  CHARACTER(LEN=80)		::FMT
-  CHARACTER(LEN=1024) 		::filename  
+  LOGICAL			              ::converged
+  CHARACTER(LEN=50)		      ::argv
+  CHARACTER(LEN=15)		      ::element;
+  CHARACTER(LEN=80)		      ::FMT
+  CHARACTER(LEN=1024) 		  ::filename  
   
 !------------------------------------------------------------------------------
 ! 2. Declare dynamic arrays
@@ -515,17 +508,15 @@
 !------------------------------------------------------------------------------
   IF(numpe .EQ. 1)PRINT*,"ParaFEM: "
   
-  debug = .true.
-  
   ! Barrier (may not be needed but safe)
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   
   ! Set Base paramenter
-  argv		=  "Case"			! Name files write to
-  nlen		=  4				! Length of Name
-  limit		=  5000				! Max number of Interation in PCG
-  tol		=  1e-6				! Tolerance of PCG loop
-  element	=  "hexahedron"			! Element Name
+  argv		=  "Case"			  ! Name files write to
+  nlen		=  4				    ! Length of Name
+  limit		=  5000				  ! Max number of Interation in PCG
+  tol		  =  1e-6				  ! Tolerance of PCG loop
+  element	=  "hexahedron"	! Element Name
   
   ! Set Numerical and Material Values 
   alpha1  =  numVar(1)
@@ -533,10 +524,10 @@
   theta   =  numVar(3)
   dtim	  =  numVar(4)  
 
-  c1	  =  (1._iwp-theta)*dtim
-  c2	  =  beta1-c1
-  c3	  =  alpha1+1._iwp/(theta*dtim);
-  c4	  =  beta1+theta*dtim
+  c1	    =  (1._iwp-theta)*dtim
+  c2	    =  beta1-c1
+  c3	    =  alpha1+1._iwp/(theta*dtim);
+  c4	    =  beta1+theta*dtim
   
   ! Allocate memory required for the time loop
   IF(.NOT.ALLOCATED(timest))THEN
@@ -555,10 +546,10 @@
   timest(1)=elap_time()
   
   ! Clean Arrays
-  x0_pp    =  zero;	d1x0_pp	 =  zero; 	x1_pp    =  zero; 
-  vu_pp    =  zero; 	u_pp	 =  zero;	d2x0_pp  =  zero; 
-  loads_pp =  zero; 	d1x1_pp  =  zero;	d2x1_pp  =  zero;
-  d_pp	   =  zero; 	p_pp	 =  zero;	x_pp	 =  zero; 
+  x0_pp    =  zero;	  d1x0_pp	=  zero; 	x1_pp    =  zero; 
+  vu_pp    =  zero; 	u_pp    =  zero;  d2x0_pp  =  zero; 
+  loads_pp =  zero; 	d1x1_pp =  zero;	d2x1_pp  =  zero;
+  d_pp	   =  zero; 	p_pp    =  zero;	x_pp	   =  zero; 
   xnew_pp  =  zero; 	
   
 !------------------------------------------------------------------------------
@@ -568,11 +559,9 @@
   timest(2)	=  elap_time()
 
   fext_pp	=  zero
-  val_2D	=  zero
-  val_2D	=  val/2.0 ! Correction for 2D Meshes
 
   ! Load fext_pp based on global load vector
-  CALL load(g_g_pp,g_num_pp,node,val_2D,fext_pp)
+  CALL load(g_g_pp,g_num_pp,node,val,fext_pp)
  
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
  
@@ -583,9 +572,6 @@
 !------------------------------------------------------------------------------
 ! 5. Set Initial Conditions
 !------------------------------------------------------------------------------
-  ! NOTE: pmul_pp=Dfield
-
-  timest(4)=elap_time()
 
 ! - scatter_noadd has no barriers in the subroutine
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
@@ -596,27 +582,22 @@
   CALL scatter_noadd(Afield,d2x0_pp)
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
-  timest(5)=elap_time()
-  
-!------------------------------------------------------------------------------
-! 6. Time Loop
-!------------------------------------------------------------------------------
-
-  u_pp		=  zero
-  vu_pp		=  zero
+  u_pp		  =  zero
+  vu_pp		  =  zero
   loads_pp	=  zero
-  pmul_pp	=  zero
-  temp_pp	=  zero
+  pmul_pp	  =  zero
+  temp_pp	  =  zero
+
+  timest(4)=elap_time()
   
 !------------------------------------------------------------------------------
-! 7. Displacement
+! 6. Displacement
 !------------------------------------------------------------------------------
    temp_pp  =  store_km_pp*c2+store_mm_pp*c3
    
    CALL gather(x0_pp,pmul_pp)
    
    DO iel=1,nels_pp
-
      CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,                 &
                 pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
    END DO
@@ -624,7 +605,7 @@
    CALL scatter(u_pp,utemp_pp)
    
 !------------------------------------------------------------------------------
-! 8. Velocity
+! 7. Velocity
 !------------------------------------------------------------------------------
    temp_pp=store_mm_pp/theta
    
@@ -635,83 +616,86 @@
                 pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
    END DO
    
-   CALL scatter(vu_pp,utemp_pp) 
+   CALL scatter(vu_pp,utemp_pp)
+
+   timest(5) =  elap_time()
    
 !------------------------------------------------------------------------------
-! 9. Bulid Right Hand Side
+! 8. Bulid Right Hand Side
 !------------------------------------------------------------------------------
 
-  loads_pp 	=  fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
+  loads_pp 	  =  fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
   fext_o_pp 	=  fext_pp
-  loads_pp	=  u_pp+vu_pp+loads_pp
-  temp_pp	=  store_mm_pp*c3+store_km_pp*c4
+  loads_pp	  =  u_pp+vu_pp+loads_pp
+  temp_pp	    =  store_mm_pp*c3+store_km_pp*c4
 
-  timest(7) =  elap_time()
+  timest(6) =  elap_time()
   
 !------------------------------------------------------------------------------
-! 10. PCG
+! 9. PCG
 !------------------------------------------------------------------------------
+
   IF(ABS(SUM_P(loads_pp)) .GE. 1E-10)THEN
-   IF(numpe .EQ. 1)PRINT*,"Solving using PCG"
-   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
+    IF(numpe .EQ. 1)PRINT*,"Solving using PCG"
+    !CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
    
-   d_pp  =  diag_precon_pp*loads_pp
-   p_pp  =  d_pp
-   x_pp  =  zero
-   iters =  0
+    d_pp  =  diag_precon_pp*loads_pp
+    p_pp  =  d_pp
+    x_pp  =  zero
+    iters =  0
    
-   iterations: DO
-     iters =  iters+1
-     u_pp  =  zero
-     vu_pp =  zero
+    iterations: DO
+      iters =  iters+1
+      u_pp  =  zero
+      vu_pp =  zero
      
-     CALL gather(p_pp,pmul_pp)
+      CALL gather(p_pp,pmul_pp)
      
-     elements_4: DO iel=1,nels_pp
- 	   CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,               &
+      elements_4: DO iel=1,nels_pp
+ 	      CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,   &
                    pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
-     END DO elements_4; 
-     
-     CALL scatter(u_pp,utemp_pp)
-     
-     up		=  DOT_PRODUCT_P(loads_pp,d_pp);
-     alpha	=  up/DOT_PRODUCT_P(p_pp,u_pp)
-     xnew_pp	=  x_pp+p_pp*alpha; 
-     loads_pp	=  loads_pp-u_pp*alpha
-     d_pp	=  diag_precon_pp*loads_pp; 
-     beta	=  DOT_PRODUCT_P(loads_pp,d_pp)/up  
-     p_pp	=  d_pp+p_pp*beta; 
-     u_pp	=  xnew_pp
-     
-     CALL checon_par(xnew_pp,tol,converged,x_pp)
-     
-     IF(converged.OR.iters==limit)EXIT
-   END DO iterations
+      END DO elements_4; 
+      
+      CALL scatter(u_pp,utemp_pp)
+      
+      up		=  DOT_PRODUCT_P(loads_pp,d_pp);
+      alpha	=  up/DOT_PRODUCT_P(p_pp,u_pp)
+      xnew_pp	=  x_pp+p_pp*alpha; 
+      loads_pp	=  loads_pp-u_pp*alpha
+      d_pp	=  diag_precon_pp*loads_pp; 
+      beta	=  DOT_PRODUCT_P(loads_pp,d_pp)/up  
+      p_pp	=  d_pp+p_pp*beta; 
+      u_pp	=  xnew_pp
+      
+      CALL checon_par(xnew_pp,tol,converged,x_pp)
+      
+      IF(converged.OR.iters==limit)EXIT
+    END DO iterations
    
 !------------------------------------------------------------------------------
-! 11. PCG END
+! 10. PCG END
 !------------------------------------------------------------------------------
-   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
+   !CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
    
    IF(numpe .EQ. 1)PRINT*,"Number of Iterations: ",iters
    ENDIF
-   x1_pp	=  xnew_pp
+   x1_pp	  =  xnew_pp
    utemp_pp	=  zero
    d1x1_pp	=  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
    d2x1_pp	=  (d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta
-   x0_pp	=  x1_pp;
+   x0_pp	  =  x1_pp;
    d1x0_pp	=  d1x1_pp
    d2x0_pp	=  d2x1_pp;
    
-  timest(8)=elap_time()
+  timest(7) = elap_time()
   
 !------------------------------------------------------------------------------
-! 12. Gather Data from ntot,nels_pp to ndim,nodes_pp
+! 11. Gather Data from ntot,nels_pp to ndim,nodes_pp
 !------------------------------------------------------------------------------
-  timest(9)=elap_time()
 
   IF(.NOT.ALLOCATED(eld_pp))THEN
    ALLOCATE(eld_pp(ntot,nels_pp))
+   printres=1
   END IF
 
   eld_pp   =  zero
@@ -728,10 +712,10 @@
   CALL gather(d2x1_pp(1:),eld_pp)
   Afield=eld_pp
 
-  timest(10)=elap_time()
+  timest(8)=elap_time()
   
 !------------------------------------------------------------------------------
-! 14. Print Runtime Information to File
+! 12. Print Runtime Information to File
 !------------------------------------------------------------------------------
 
   IF(numpe==1 .AND. printres==1)THEN
@@ -739,11 +723,13 @@
   printres=0
   OPEN(10,FILE=argv(1:nlen)//".run",STATUS='REPLACE',ACTION='WRITE')
     WRITE(10,'(A,F10.4)') "Time to load:",timest(3)-timest(2)
-    WRITE(10,'(A,F10.4)') "Time to Set ICs:",timest(5)-timest(4)
-    WRITE(10,'(A,F10.4)') "Time to Build RHS:",timest(7)-timest(5)
-    WRITE(10,'(A,F10.4)') "Time to Solve using PCG:",timest(8)-timest(7)
-    WRITE(10,'(A,F10.4)') "Time to Gather Data:",timest(10)-timest(9)
+    WRITE(10,'(A,F10.4)') "Time to Set ICs:",timest(4)-timest(3)
+    WRITE(10,'(A,F10.4)') "Displacement & Velocity:",timest(5)-timest(4)    
+    WRITE(10,'(A,F10.4)') "Time to Build RHS:",timest(6)-timest(5)
+    WRITE(10,'(A,F10.4)') "Time to Solve using PCG:",timest(7)-timest(6)
+    WRITE(10,'(A,F10.4)') "Time to Gather Data:",timest(8)-timest(7)
     WRITE(10,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
+    WRITE(10,'(A,F10.4)') "-------------------------------------------------"
     WRITE(10,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
     WRITE(10,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
     WRITE(10,'(A,I10)') "Total Virtual Memory(Kb): ",VM
@@ -772,10 +758,10 @@
   !*
   !*  INPUTS
   !*    force(loaded_nodes*ndim)	: Mesh coordinates (stressMesh OpenFOAM)
-  !* 	sense(loaded_nodes*ndim)	: Vector to define x,y,z 
-  !* 	node(loaded_nodes*ndim)		: Node Numbers of loaded nodes
-  !*   	solidPatchIDSize			: Size of boundary Mesh	
-  !*    nn							: # of Nodes  			
+  !* 	  sense(loaded_nodes*ndim)	: Vector to define x,y,z 
+  !* 	  node(loaded_nodes*ndim)		: Node Numbers of loaded nodes
+  !*   	solidPatchIDSize			    : Size of boundary Mesh	
+  !*    nn							          : # of Nodes  			
   !*
   !*  OUTPUTS:
   !*	Writes to file "argv".ensi.NDLDS
@@ -787,34 +773,40 @@
   !*
   !* -------------------------------------------------------------------
   !USE mpi_wrapper  !remove comment for serial compilation
-  USE precision; USE global_variables; USE mp_interface; USE input
-  USE output; USE loading; USE timing; USE maths; USE gather_scatter
-  USE steering; USE new_library; IMPLICIT NONE
+  USE precision;  USE global_variables; USE mp_interface; 
+  USE input;      USE output;           USE loading;
+  USE timing;     USE maths;            USE gather_scatter
+  USE steering;   USE new_library;
+  
+  IMPLICIT NONE
+  
   !----------------------  Declarations --------------------------------!
-  INTEGER,PARAMETER::nodof=3,ndim=3,nst=6,nod=8
-  INTEGER :: solidPatchIDSize,nlen,nn,loaded_nodes,pos,i,j
-  INTEGER,INTENT(IN) :: sense(solidPatchIDSize*ndim),node(solidPatchIDSize*ndim)
-  REAL(iwp),INTENT(IN) :: force(solidPatchIDSize*ndim)
-  REAL(iwp),PARAMETER::zero=0.0_iwp
-  REAL(iwp) :: loads(nn*ndim)
-  CHARACTER(LEN=15) :: argv
+  INTEGER,PARAMETER       ::nodof=3,ndim=3,nst=6,nod=8
+  INTEGER                 :: solidPatchIDSize,nlen,nn,loaded_nodes,pos,i,j
+  INTEGER,INTENT(IN)      :: sense(solidPatchIDSize*ndim),node(solidPatchIDSize*ndim)
+  REAL(iwp),INTENT(IN)    :: force(solidPatchIDSize*ndim)
+  REAL(iwp),PARAMETER     ::zero=0.0_iwp
+  REAL(iwp)               :: loads(nn*ndim)
+  CHARACTER(LEN=15)       :: argv
+
   !--------------------- Set Variables for Mesh_ensi -------------------!
   argv="Case"; nlen=4; loads=zero
+
   !--------------------- Write loaded nodes ----------------------------!
   OPEN(16,FILE=argv(1:nlen)//'.ensi.NDLDS', status = "replace")
   WRITE(16,'(A)')     "Alya Ensight Gold --- Vector per-node variable file"
   WRITE(16,'(A/A/A)') "part", "      1","coordinates"
   DO i=1,solidPatchIDSize*ndim
-   pos = ((node(i))*ndim)+sense(i)
-   loads(pos)=force(i)
+    pos = ((node(i))*ndim)+sense(i)
+    loads(pos)=force(i)
   END DO 
+
   DO j=1,ndim; DO i=1,nn
     WRITE(16,'(E12.5)') loads(((i-1)*ndim)+j)
   ENDDO; ENDDO
+
   CLOSE(16)
   END SUBROUTINE
-
-
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
@@ -830,11 +822,11 @@
   !*    Prints the Solid Mesh to mesh_ensi format  
   !*
   !*  INPUTS
-  !*    g_coord(ndim,nn)	: Mesh coordinates (stressMesh OpenFOAM)			
-  !*	g_num(nod,nels)		: Steering Matrix (x-y-z)				
-  !*	rest_ensi(nodof+1,nr)	: Restrained Nodes
-  !*    nn			: # of Nodes 
-  !*	els=nels		: # of Elements/Cells
+  !*    g_coord(ndim,nn)	    : Mesh coordinates (stressMesh OpenFOAM)			
+  !*	  g_num(nod,nels)		    : Steering Matrix (x-y-z)				
+  !*	  rest_ensi(nodof+1,nr)	: Restrained Nodes
+  !*    nn			              : # of Nodes 
+  !*	  els=nels		          : # of Elements/Cells
   !*			
   !*  OUTPUTS:
   !*	Writes to file "argv".ensi.case and oter. "argv".ensi.xxx files
@@ -845,18 +837,26 @@
   !*
   !* --------------------------------------------------------------------
   !USE mpi_wrapper  !remove comment for serial compilation
-  USE precision; USE global_variables; USE mp_interface; USE input
-  USE output; USE loading; USE timing; USE maths; USE gather_scatter
-  USE steering; USE new_library; IMPLICIT NONE
+  USE precision;  USE global_variables; USE mp_interface; 
+  USE input;      USE output;           USE loading;
+  USE timing;     USE maths;            USE gather_scatter
+  USE steering;   USE new_library;
+  
+  IMPLICIT NONE
+
   !----------------------  Declarations --------------------------!
-  INTEGER,INTENT(IN) :: nn,els
+  INTEGER,INTENT(IN)    :: nn,els
+
   !---------------------- Mesh_Ensi Declarations -----------------!
-  INTEGER :: i,j,k,l,m,n,iel,nels,ndim,nod,BC,nlen,prnwidth,		&
-		nstep,npri,remainder,etype(els),rest_ensi(4,nn),	&
-		mesh_print,g_num_print, g_num(8,els)
-    REAL(iwp) :: dtim,g_coord(3,nn)
-    LOGICAL :: solid 
-    CHARACTER(LEN=15) :: argv,element  
+  INTEGER               :: i,j,k,l,m,n,iel,nels,ndim
+  INTEGER               :: nod,BC,nlen,prnwidth		
+	INTEGER               :: nstep,npri,remainder
+  INTEGER               :: etype(els),rest_ensi(4,nn)
+	INTEGER               :: mesh_print,g_num_print, g_num(8,els)
+    
+  REAL(iwp)             :: dtim,g_coord(3,nn)
+  LOGICAL               :: solid 
+  CHARACTER(LEN=15)     :: argv,element  
   !----------------------------------------------------------------------
   ! 1. Initialisation
   !----------------------------------------------------------------------
@@ -865,14 +865,14 @@
     nels = UBOUND(g_num,2)   ; nod  = UBOUND(g_num,1)
 
 !--------------------- Set Variables for Mesh_ensi --------------!
-    etype(:)=0
-    argv="Case"
-    nlen=4
-    element="hexahedron"
-    nstep=1
-    npri=1
-    dtim=1
-    solid=.true.
+    etype(:)  = 0
+    argv      = "Case"
+    nlen      = 4
+    element   = "hexahedron"
+    nstep     = 1
+    npri      = 1
+    dtim      = 1
+    solid     = .true.
   !------------------------------------------------------------------------------
   ! 2. Write case file
   !------------------------------------------------------------------------------
@@ -1130,15 +1130,15 @@
 
   !*  INPUTS
   !*    g_coord(ndim,nn)	: Mesh coordinates (stressMesh OpenFOAM)		
-  !*	g_num(nod,nels)		: Steering Matrix (OF Format) 		
-  !*	nn			: Number of solid Points 
-  !*	npes			: Number of processes
-  !*	nod			: Number of nodes per element
-  !*	ndim			: Number of dimensions per node		  
-  !*	g_num_pp(nod,nels)	: Steering Matrix
+  !*	  g_num(nod,nels)		: Steering Matrix (OF Format) 		
+  !*	  nn			          : Number of solid Points 
+  !*	  npes			        : Number of processes
+  !*	  nod			          : Number of nodes per element
+  !*	  ndim			        : Number of dimensions per node		  
+  !*	  g_num_pp(nod,nels): Steering Matrix
   !*			
   !*  OUTPUTS:
-  !*	g_coord_pp(nod,ndim,nels_pp)	: Coordinate matrix
+  !*	  g_coord_pp(nod,ndim,nels_pp)	: Coordinate matrix
   !*    
   !*  AUTHOR
   !*    Sam Hewitt
@@ -1275,17 +1275,17 @@ SUBROUTINE POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
   !*    Usage: CALL populate_g_coord_pp2(g_coord,g_coord_pp,g_num_pp,	&
   !* 					     nod,ndim)
   !*  FUNCTION
-  !*	Populates g_coord_pp based on g_coord
+  !*	  Populates g_coord_pp based on g_coord
 
   !*  INPUTS
   !*    g_coord(ndim,nn)	: Mesh coordinate list		
-  !*	g_num(nod,nels)		: Steering Matrix (OF Format) 		
-  !*	nod			: Number of nodes per element
-  !*	ndim			: Number of dimensions per node		  
-  !*	g_num_pp(nod,nels)	: Steering Matrix
+  !*	  g_num(nod,nels)		: Steering Matrix (OF Format) 		
+  !*	  nod			          : Number of nodes per element
+  !*	  ndim			        : Number of dimensions per node		  
+  !*	  g_num_pp(nod,nels): Steering Matrix
   !*			
   !*  OUTPUTS:
-  !*	g_coord_pp(nod,ndim,nels_pp)	: Coordinate matrix
+  !*	  g_coord_pp(nod,ndim,nels_pp)	: Coordinate matrix
   !*    
   !*  AUTHOR
   !*    Sam Hewitt
@@ -1339,16 +1339,16 @@ SUBROUTINE POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
   !*  AUTHORS
   !*    S. Hewitt
   !* 
-  !*
   !* ---------------------------------------------------------------------------
 
   USE precision; IMPLICIT NONE
-  INTEGER :: i,temp(nod)
-  INTEGER,INTENT(IN) :: nod
-  INTEGER,INTENT(INOUT):: vector(nod)
-  CHARACTER(LEN=15) :: element 
+  INTEGER               :: i,temp(nod)
+  INTEGER,INTENT(IN)    :: nod
+  INTEGER,INTENT(INOUT) :: vector(nod)
+  CHARACTER(LEN=15)     :: element 
 
   temp=0.0_iwp
+
   SELECT CASE(element) 
    CASE('hexahedron')
      SELECT CASE(nod)
@@ -1365,7 +1365,7 @@ SUBROUTINE POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
 !	    vector(8)=temp(3)
 
 	! Code from OpenFOAM2sg:
-	temp(:)      = vector(:)
+      	temp(:)      = vector(:)
         vector(1)  = temp(5)
         vector(2)  = temp(7)
         vector(3)  = temp(8)

@@ -199,6 +199,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     ptUtemp_(0),
     ptAtemp_(0),
     rbfUpdate_(false),
+    twoDimensional_(false),
     D_
     (
         IOobject
@@ -464,7 +465,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Restrained Arrays
 //------------------------------------------------------------------------------
-// paraFem	:  0=Restrained 1=Unrestrained
+// paraFem	    :  0=Restrained 1=Unrestrained
 // ensi_gold	:  1=Restrained 0=Unrestrained
 
     numRestrNodes_  =  0;
@@ -479,68 +480,69 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
             )
         )
         {
-	    numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
-	}
+	        numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
+	    }
         
         if 
-	(
+        (
             isA<emptyPointPatchVectorField>
             (
                 pointD_.boundaryField()[patchI]
             )
-	)
-	{
-	    numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
-	}	
+        )
+	    {
+	        numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
+	        twoDimensional_ = true;
+	    }	
     }
  
+    if(twoDimensional_)
+    {
+	    Info << "Simulation is 2D" << endl;
+    }
     // Declare local Restrained List    
     labelListList localRest(numRestrNodes_);
-
-    // Second Time populate
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Boundary Conditions 
 //------------------------------------------------------------------------------
+// Special care Needs to be taken here, the current method isn't robust 
 
     int counter = 0;    
 
     forAll(pointD_.boundaryField(), patchI)
     {
 
-	// ------ Fixed Z ------
-	if 
-	(
-            isA<emptyPointPatchVectorField>
-            (
-                pointD_.boundaryField()[patchI]
-            )
-	)
-	{
-	    const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
+        // ------ Fixed Z ------
+        if 
+        (
+                isA<emptyPointPatchVectorField>
+                (
+                    pointD_.boundaryField()[patchI]
+                )
+        )
+        {
+            const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
 
-	    forAll(mp, pI)
-	    {
-  	        labelList myList(4);
-		if(Pstream::parRun()==true)
-    		{
-		    myList[0]  =  pointProcAddressing_[mp[pI]]+1;
-		}
-		else
-		{
-		    myList[0]  =  mp[pI]+1;
-		}
-		if (localRest[mp[pI]].size() == 0)
-		{	
-		    myList[1]  =  1;
-		    myList[2]  =  1;
-		    myList[3]  =  0;
-	            localRest[counter] =  myList;
-                    counter++;
-		}
-	    }  
-	}
+            forAll(mp, pI)
+            {
+                labelList myList(4);
+                if(Pstream::parRun()==true)
+                {
+                    myList[0]  =  pointProcAddressing_[mp[pI]]+1;
+                }
+                else
+                {
+                    myList[0]  =  mp[pI]+1;
+                }
 
+                myList[1]  =  1;
+                myList[2]  =  1;
+                myList[3]  =  0;
+                localRest[counter] =  myList;
+                counter++;
+            }
+        }
 
         // ------ Fixed X Y Z ------
         if 
@@ -550,53 +552,53 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
                 pointD_.boundaryField()[patchI]
             ) 
         )
-	{
-	    const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
+        {
+            const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
 
-	    forAll(mp, pI)
-	    {
-  	        labelList myList(4);
-		if(Pstream::parRun()==true)
-    		{
-		    myList[0]  =  pointProcAddressing_[mp[pI]]+1;
-		}
-		else
-		{
-		    myList[0]  =  mp[pI]+1;
-		}
-	        myList[1]  =  0;
-	        myList[2]  =  0;
-	        myList[3]  =  0;
+            forAll(mp, pI)
+            {
+                labelList myList(4);
+                if(Pstream::parRun()==true)
+                {
+                    myList[0]  =  pointProcAddressing_[mp[pI]]+1;
+                }
+                else
+                {
+                    myList[0]  =  mp[pI]+1;
+                }
+
+                if(mesh.boundary()[patchI].name() == "frontAndBack")
+                {
+                    myList[1]  =  1;
+                    myList[2]  =  1;
+                    myList[3]  =  0;
+                }
+                else
+                {
+                    myList[1]  =  0;
+                    myList[2]  =  0;
+                    myList[3]  =  0;
+                }
                 localRest[counter] =  myList;
                 counter++;
-	    }	
-	}
+            }
+        }
     }
 
 //------------------------------------------------------------------------------
 //  ParaFEM: gnereating Restrained Array 
 //------------------------------------------------------------------------------
 
-    // Resize Lists
-    label resize = 0;
-    forAll(localRest,listI)
-    {
-	if(localRest[listI].size() !=0)
-	{
-	    resize++;
-	}
-    }
-
-    localRest.resize(resize);
+    // Sort lists
+    sort(localRest);
     numRestrNodes_ = localRest.size();
 
     // Gather All Lists
-    List<List<List<label>>> globalRest(Pstream::nProcs(), localRest);
-    
-    globalRest[Pstream::myProcNo()] = localRest;
+    List<List<List<label>>> globalRest(Pstream::nProcs(), localRest);   
+    //globalRest[Pstream::myProcNo()] = localRest;
 
     Pstream::gatherList(globalRest);
-    Pstream::scatterList(globalRest);  
+    Pstream::scatterList(globalRest); 
 
     // Create master Rest;
     reduce(numRestrNodes_,sumOp<double>());
@@ -605,40 +607,58 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     label restIndex = 0;
     forAll(globalRest,procI)
     {
-	forAll(globalRest[procI],listI)
-	{
-	    masterRest[restIndex]=globalRest[procI][listI];
-	    restIndex++;
-	}
+        forAll(globalRest[procI],listI)
+        {
+            masterRest[restIndex]=globalRest[procI][listI];
+            restIndex++;
+        }
     }
 
     //Sort and find duplicate nodes
     sort(masterRest);
-
     labelList duplicateNodes;
-
-    duplicateOrder(masterRest,duplicateNodes);   
+    duplicateOrder(masterRest,duplicateNodes);
 
     // Copy Restrained labelList into rest_
-    numRestrNodes_ = numRestrNodes_ - duplicateNodes.size();
+    //numRestrNodes_ = numRestrNodes_ - duplicateNodes.size();
+    numRestrNodes_ = masterRest[numRestrNodes_-1][0];
     rest_ = new int [numRestrNodes_*4];
     restIndex = 0;
 
     forAll(masterRest,listI)
     {
-	if (listI != 0 && masterRest[listI][0] == masterRest[listI-1][0])
+        if (listI != 0 && masterRest[listI][0] == masterRest[listI-1][0])
         {
-	     continue;
-	}
-	else
-	{
-	    rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
+            continue;
+        }
+        else
+        {
+            rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
             rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
             rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
             rest_[ numRestrNodes_* 3 + restIndex ] =  masterRest[listI][3];
-	    restIndex++;	
-	}
+            restIndex++;	
+        }
     }
+
+    // Debugging
+    // Most Errors occur from boundary conditions 
+    if(false)
+    {
+        fileName outputFile("rest.txt");
+        OFstream os(db().time().system()/outputFile);
+        os << "Restrained Array.\n" << endl;
+        os << numRestrNodes_ << "\n{" << endl;
+        for(int i = 0; i < numRestrNodes_; i++)
+        {
+            os << rest_[numRestrNodes_* 0 + i] << " ";
+            os << rest_[numRestrNodes_* 1 + i] << " ";
+            os << rest_[numRestrNodes_* 2 + i] << " ";
+            os << rest_[numRestrNodes_* 3 + i]  << endl;
+        }
+        os << "}" << endl;
+    }   
+
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Arrays for intialisation
@@ -1766,7 +1786,7 @@ bool DyParaFEMSolid::evolve()
 	
     }
 
-
+    
 //------------------------------------------------------------------------------
 //  ParaFEM: Run ParaFEM Code
 //------------------------------------------------------------------------------
