@@ -149,6 +149,9 @@ class DyParaFEMSolid
         //- Use rbf interpolation
         Switch rbfUpdate_;
 
+        //- Check if Simulation 2D
+        Switch twoDimensional_;
+
         //- Displacement field
         volVectorField D_;
 

@@ -34,37 +34,33 @@ if (rbfUpdate_)
 	    vectorField fForce(patchD.size(),vector::zero);
 
  	    // Create Face forces from Face tractions and face Areas 
-           forAll(patchD,faceI)
-               {
-                    fForce[faceI] = fTraction[faceI];
-		    fForce[faceI] *= magSf.boundaryField()[patchI][faceI];
-               }
+        forAll(patchD,faceI)
+        {
+            fForce[faceI] = fTraction[faceI];
+            fForce[faceI] *= magSf.boundaryField()[patchI][faceI];
+        }
 
 	    matrix faceX(fc.size(), 3);
 	    matrix faceY(fc.size(), 3);
 	    matrix pointX(lp.size(), 3);
 	    matrix pointY(lp.size(), 3);
 
-            forAll(fc, faceI)
-            {
-                faceX(faceI, 0) = fc[faceI].x();
-                faceX(faceI, 1) = fc[faceI].y();
-                faceX(faceI, 2) = fc[faceI].z();
+        forAll(fc, faceI)
+        {
+            faceX(faceI, 0) = fc[faceI].x();
+            faceX(faceI, 1) = fc[faceI].y();
+            faceX(faceI, 2) = fc[faceI].z();
 
-                faceY(faceI, 0) = fForce[faceI].x();
-                faceY(faceI, 1) = fForce[faceI].y();
-                faceY(faceI, 2) = fForce[faceI].z();
-
-//                faceY(faceI, 0) = fTraction[faceI].x();
-//                faceY(faceI, 1) = fTraction[faceI].y();
-//                faceY(faceI, 2) = fTraction[faceI].z();
-            }
+            faceY(faceI, 0) = fForce[faceI].x();
+            faceY(faceI, 1) = fForce[faceI].y();
+            faceY(faceI, 2) = fForce[faceI].z();
+        }
 
 	    forAll(lp, pointI)
 	    {
-                pointX(pointI, 0) = lp[pointI].x();
-                pointX(pointI, 1) = lp[pointI].y();
-                pointX(pointI, 2) = lp[pointI].z();
+            pointX(pointI, 0) = lp[pointI].x();
+            pointX(pointI, 1) = lp[pointI].y();
+            pointX(pointI, 2) = lp[pointI].z();
 	    }
 
 	    {
@@ -80,7 +76,7 @@ if (rbfUpdate_)
                        new RBFInterpolation( rbfFunction ) 
                     );
 
-                rbf->compute( faceX, pointX );
+            rbf->compute( faceX, pointX );
 	        rbf->interpolate( faceY, pointY );
 	    }
  
@@ -88,41 +84,41 @@ if (rbfUpdate_)
 	    vectorField pTraction(lp.size(), vector::zero);
 	    forAll(pTraction, pointI)
 	    {
-                pTraction[pointI] = 
-                    vector
-                    (
-                        pointY(pointI, 0),
-                        pointY(pointI, 1),
-                        pointY(pointI, 2)
-                    );
+            pTraction[pointI] = 
+                vector
+                (
+                    pointY(pointI, 0),
+                    pointY(pointI, 1),
+                    pointY(pointI, 2)
+                );
 	    }
 
-	    Info << "Total Point Force: " << gSum(pTraction) << endl;
-            
-	   // Info << "Absolute Error" << sum(pTraction)-sum(fForce) << endl;
- 
+        if(twoDimensional_)
+        {
+            pTraction /= 2;
+        }
+
+        Info << "Total Point Force: " << gSum(pTraction) << endl;
+             
             forAll(pTraction, pointI)
             {
                 // Populate Force Vector force(FX1 FY1 FZ1.....FXN FYN FZN)
-
                 fext_OF_[gi*ndim+0] = pTraction[pointI].x();
                 fext_OF_[gi*ndim+1] = pTraction[pointI].y();
                 fext_OF_[gi*ndim+2] = pTraction[pointI].z();
+                gi++;
 
-		gi++;
-	    }
+	        }
         }
     }
 }
 else
 {
     Info << "Update force using primitive patch interpolation" << endl;
-
-
     label gi = 0;
     forAll(D_.boundaryField(), patchI)
     {
-       if
+        if
         (
             isA<tractionDisplacementFvPatchVectorField>
             (
@@ -136,40 +132,56 @@ else
                     D_.boundaryField()[patchI]
                 );
 
- 	    const surfaceScalarField& magSf = mesh().magSf();
+ 	        const surfaceScalarField& magSf = mesh().magSf();
 
-	    vectorField fTraction = patchD.traction();
-	    vectorField fForce(patchD.size(),vector::zero);
+	        vectorField fTraction = patchD.traction();
+	        vectorField fForce(patchD.size(),vector::zero);
 
  	    // Create Face forces from Face tractions and face Areas 
             forAll(patchD,faceI)
-                {
-                    fForce[faceI] = fTraction[faceI];
-		    fForce[faceI] *= magSf.boundaryField()[patchI][faceI];
+            {
+                fForce[faceI] = fTraction[faceI];
+		        fForce[faceI] *= magSf.boundaryField()[patchI][faceI];
 
-               }	
+            }	
 
-	    primitivePatchInterpolation patchInterpolator
+	        primitivePatchInterpolation patchInterpolator
             (
                 mesh().boundaryMesh()[patchI]
             );	
 
-	    vectorField pForce =
-		patchInterpolator.faceToPointInterpolate
-		(
-		    fForce
-	        );
+            vectorField pForce =
+            patchInterpolator.faceToPointInterpolate
+            (
+                fForce
+            );
 
+            if(twoDimensional_)
+            {
+                pForce /= 2;
+            }
+            
+            Info << "Total Point Force: " << gSum(pForce) << endl;
 
-	    Info << "Total Point Force: " << gSum(pForce) << endl;
-	    	
-	    gi = 0;
+            gi = 0;
             forAll(pForce,pointI)
             {
-            	fext_OF_[gi*ndim+0] = pForce[pointI].x();
-      	    	fext_OF_[gi*ndim+1] = pForce[pointI].y();
-            	fext_OF_[gi*ndim+2] = pForce[pointI].z();
-	    	gi++;
+                //if(twoDimensional_)
+                if(false)
+                {
+                    Info << "TWO DIMENSIONAL" << endl;        
+                    fext_OF_[gi*ndim+0] = pForce[pointI].x()/2;
+                    fext_OF_[gi*ndim+1] = pForce[pointI].y()/2;
+                    fext_OF_[gi*ndim+2] = pForce[pointI].z()/2;
+                    gi++;
+                }
+                else
+                {
+                    fext_OF_[gi*ndim+0] = pForce[pointI].x();
+                    fext_OF_[gi*ndim+1] = pForce[pointI].y();
+                    fext_OF_[gi*ndim+2] = pForce[pointI].z();
+                    gi++;
+                }
             }
 	    
 
@@ -178,4 +190,3 @@ else
     }  // End forAll (forAll Patches)
 
 }  // End Else (rbf vs PrimPatch)
-
