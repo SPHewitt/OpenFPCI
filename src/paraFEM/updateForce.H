@@ -166,22 +166,10 @@ else
             gi = 0;
             forAll(pForce,pointI)
             {
-                //if(twoDimensional_)
-                if(false)
-                {
-                    Info << "TWO DIMENSIONAL" << endl;        
-                    fext_OF_[gi*ndim+0] = pForce[pointI].x()/2;
-                    fext_OF_[gi*ndim+1] = pForce[pointI].y()/2;
-                    fext_OF_[gi*ndim+2] = pForce[pointI].z()/2;
-                    gi++;
-                }
-                else
-                {
                     fext_OF_[gi*ndim+0] = pForce[pointI].x();
                     fext_OF_[gi*ndim+1] = pForce[pointI].y();
                     fext_OF_[gi*ndim+2] = pForce[pointI].z();
                     gi++;
-                }
             }
 	    
 
