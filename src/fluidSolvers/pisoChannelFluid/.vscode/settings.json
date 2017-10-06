@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "system_error": "c",
+        "ostream": "c",
+        "array": "c",
+        "initializer_list": "c",
+        "utility": "c",
+        "setdeltatfsi.h": "c",
+        "readtimecontrolsfsi.h": "c",
+        "*.tcc": "c"
+    },
+    "git.ignoreLimitWarning": true
+}
