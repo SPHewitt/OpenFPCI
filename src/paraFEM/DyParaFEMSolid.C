@@ -890,17 +890,12 @@ DyParaFEMSolid::~DyParaFEMSolid()
     delete[] store_km_pp_OF_;
     delete[] store_mm_pp_OF_;
     delete[] diag_precon_pp_OF_;
-    delete[] rest_;
     delete[] solidProps_;
-    delete[] mPoints_;
     delete[] g_num_pp_OF_;
     delete[] g_g_pp_OF_;
-    delete[] rest_ensi_;
     delete[] numSchemes_;
     delete[] forceNodes_;
     delete[] fext_OF_;
-    delete[] nodeensi_;
-    delete[] sense_;
     delete[] gravlo_;
 }
 
