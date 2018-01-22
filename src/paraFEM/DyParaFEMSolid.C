@@ -383,7 +383,6 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 	mPoints_ 	=  new double [gPoints_*ndim];
     }
 
-
     // Populate mPoints
     pointIOField startPoints
     (
@@ -422,7 +421,6 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
 
     // cellPoints() returns steering array
     const labelListList& cellPoints = mesh.cellPoints();
-
 
     label localIndex = 0;
  
@@ -586,7 +584,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     }
 
 //------------------------------------------------------------------------------
-//  ParaFEM: gnereating Restrained Array 
+//  ParaFEM: Generating Restrained Array 
 //------------------------------------------------------------------------------
 
     // Sort lists
@@ -625,6 +623,15 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     rest_ = new int [numRestrNodes_*4];
     restIndex = 0;
 
+    // Set rest to ZERO
+    for(int i; i<numRestrNodes_*4;i++)
+    {
+        rest_[i]=0.0;
+    }
+    
+    // Recount Number of Restrained Nodes
+    numRestrNodes_ = 0;
+    
     forAll(masterRest,listI)
     {
         if (listI != 0 && masterRest[listI][0] == masterRest[listI-1][0])
@@ -633,6 +640,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         }
         else
         {
+            nummRestrNodes_++;
             rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
             rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
             rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
@@ -702,7 +710,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         solidProps_,
         g_g_pp_OF_,
         store_km_pp_OF_,
-	store_mm_pp_OF_
+	    store_mm_pp_OF_
     );
 
     reduce(tmp,sumOp<label>());
@@ -745,8 +753,8 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     {
     	for(int i=0;i<neq_pp_OF;i++)
     	{
-	    gravlo_[i]=0.0;
- 	}
+	        gravlo_[i]=0.0;
+ 	    }
     }
     
 
