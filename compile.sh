@@ -7,9 +7,6 @@
 #	ParaFEM
 #	OpenFPCI 
 
-
-
-
 # Usage Info
 show_help() {
     cat << EOF

@@ -26,7 +26,7 @@ Class
     DyParaFEMSolid
 
 Description
-   The DyParaFEMSolid solver is a wrapper to integrate the paraFEM fortran
+   The DyParaFEMSolid solver is a wrapper to integrate the ParaFEM fortran
    routines into Foam-Extend. The routines solve the deformation for a
    linear elastic solid.
 
@@ -38,6 +38,32 @@ SourceFiles
     DyParaFEMSolid.C
 
 \*---------------------------------------------------------------------------*/
+
+// Documentation for Robodoc
+// 
+//****c* SolidSolver/DyParaFEMSolid.H
+//-
+//- FUNCTION
+//-   DyParaFEMSolid is a solid solver that is included in the
+//-   fluidStructureInteraction library. It acts as a wrapper between
+//-   the ParaFEM fortran subroutines and the Foam-Extend FSI library
+//-   
+//- SYNOPSIS
+//-   DyParaFEMSolid is a class that inherits from solidSolver.
+//-   Important, methods to note are the constructor and evolve
+//-   functions.
+//-    
+//-   During the constructor of this class, initparafem and 
+//-   finddiagparafem are called, initialising ParaFEM and
+//-   calculating the preconditioner. Then each time step
+//-   DyParaFEM::evolve() calls runparafem, that solves the 
+//-   governing equations of the problem. These are the two
+//-   important subroutines from this class.
+//-
+//- AUTHOR
+//-   S. Hewitt
+//- 
+//**** End Marker for RoboDoc
 
 #ifndef DyParaFEMSolid_H
 #define DyParaFEMSolid_H
@@ -68,25 +94,25 @@ class DyParaFEMSolid
 {
     // Private data
   
-        //- An array for the StressMesh Points Data
+        //- Coordinates of mesh
         double* mPoints_;
 
-        //- An array for the Solid Properties
+        //- Array for the Solid Properties
         double* solidProps_;
 
-        //- An array for the Numerical Schemes
+        //- Array for the Numerical Schemes
         double* numSchemes_;
 
-        //- Steering matrix
+        //- Element Steering matrix
         int* g_num_pp_OF_;
 
-        //- Global neq matrix
+        //- Equation Steering matrix
         int*  g_g_pp_OF_; 
 
         //-
         int jj_;
 
-        //- stiffness Matrix per processor
+        //- Stiffness Matrix per processor
         double*  store_km_pp_OF_;
 
         //- Mass Matrix per processor
@@ -95,8 +121,8 @@ class DyParaFEMSolid
         //- Diagonal Preconditioner
         double*  diag_precon_pp_OF_;
 
-	//- bodyForce
-	double* gravlo_;
+	    //- Gravity Loads
+ 	    double* gravlo_;
 
         //- Number of restrained nodes
         int numRestrNodes_;
@@ -113,13 +139,13 @@ class DyParaFEMSolid
         //- Node numbers for interface
         int* forceNodes_;
 
-        //- Force val at interface
+        //- Force value at interface
         double* fext_OF_;
 
-        //-
+        //- Node Values ensi gold
         int* nodeensi_;
 
-        //-
+        //- 
         int* sense_;
 
         //- Youngs Modulus
@@ -137,10 +163,10 @@ class DyParaFEMSolid
         //- Total Points
         int gPoints_;
 
-	//- Displacement Field PF format
-	double* ptDtemp_;
+	    //- Displacement Field PF format
+	    double* ptDtemp_;
 
-	//- Velocity Field PF format
+	    //- Velocity Field PF format
         double* ptUtemp_;
 
         //- Acceleration Field PF format
@@ -182,7 +208,7 @@ class DyParaFEMSolid
         //- Cell Processor Addressing
         labelIOList cellProcAddressing_;
 
-        //- An array for global to Local point Map (evolve Solid)
+        //- An array for Foam to ParaFEM point Map
         labelListList of2pfmap_;
 	
         //- Rheology model
@@ -191,8 +217,8 @@ class DyParaFEMSolid
         //- Cell-to-point interpolation
         leastSquaresVolPointInterpolation volToPoint_;
 
-	// Point-to-cell interpolation
-	pointVolInterpolation pointToVol_;
+	    // Point-to-cell interpolation
+	    pointVolInterpolation pointToVol_;
 
         //- Density
         volScalarField rho_;
@@ -227,10 +253,7 @@ public:
 
 
     // Destructor
-
         virtual ~DyParaFEMSolid();
-
-
 
     // Member Functions
 
@@ -254,11 +277,13 @@ public:
                 return pMesh_;
             }
 
+            //- Return stress field
             const volSymmTensorField& sigma() const
             {
                 return sigma_;
             }
 
+            // Return strain field
             const volSymmTensorField& epsilon() const
             {
                 return epsilon_;
@@ -303,8 +328,8 @@ public:
                 return volToPoint_;
             }
 
-	    //- Return multi-material interface pointer
-	    const pointVolInterpolation& pointToVol() const
+	        //- Return multi-material interface pointer
+	        const pointVolInterpolation& pointToVol() const
             {
                 return pointToVol_;
             }
@@ -515,5 +540,7 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+
 
 // ************************************************************************* //

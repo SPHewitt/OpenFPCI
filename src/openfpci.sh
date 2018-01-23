@@ -192,8 +192,8 @@ cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/
 cd ..
 find run -name options | while read item
 do
-  sed -i -e 's=$(WM_PROJECT_DIR)/applications/solvers/FSI=$(WM_PROJECT_USER_DIR)/FluidSolidInteractio#n/src=' $item
-  sed -i -e 's=$(WM_THIRD_PARTY_DIR)/packages/eigen3=$(WM_PROJECT_USER_DIR)/FluidSolidInteraction/src#/ThirdParty/eigen3=' $item
+  sed -i -e 's=$(WM_PROJECT_DIR)/applications/solvers/FSI=$(WM_PROJECT_USER_DIR)/FluidSolidInteraction/src=' $item
+  sed -i -e 's=$(WM_THIRD_PARTY_DIR)/packages/eigen3=$(WM_PROJECT_USER_DIR)/FluidSolidInteraction/src/ThirdParty/eigen3=' $item
 done
 
 cd $WORKING_DIR
