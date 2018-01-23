@@ -624,7 +624,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
     restIndex = 0;
 
     // Set rest to ZERO
-    for(int i; i<numRestrNodes_*4;i++)
+    for(int i=0; i<numRestrNodes_*4;i++)
     {
         rest_[i]=0.0;
     }
