@@ -1,0 +1,2 @@
+robodoc --src ../src/paraFEM --doc OpenFPCI-api-1.0 --singledoc --sections --index --html --debug --documenttitle "OpenFPCI API (Version 1.0)"
+
