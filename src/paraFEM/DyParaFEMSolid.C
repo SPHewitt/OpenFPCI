@@ -640,7 +640,7 @@ DyParaFEMSolid::DyParaFEMSolid(const fvMesh& mesh)
         }
         else
         {
-            nummRestrNodes_++;
+            numRestrNodes_++;
             rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
             rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
             rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
