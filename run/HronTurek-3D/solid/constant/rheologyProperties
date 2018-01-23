@@ -10,27 +10,18 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      decomposeParDict;
+    object      rheologyProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains NSLOTS;
+planeStress no;
 
-method          simple;
-
-globalFaceZones ( plateZone );
-
-simpleCoeffs
+rheology
 {
-    n               (1 NSLOTS 1);
-    delta           0.001;
+    type linearElastic;
+    rho rho [1 -3 0 0 0 0 0] 1000;
+    E E [1 -1 -2 0 0 0 0] 5.6e6;
+    nu nu [0 0 0 0 0 0 0] 0.4;
 }
-
-distributed     no;
-
-roots
-(
-);
-
 
 // ************************************************************************* //

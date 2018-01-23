@@ -10,27 +10,50 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      decomposeParDict;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains NSLOTS;
-
-method          simple;
-
-globalFaceZones ( plateZone );
-
-simpleCoeffs
+ddtSchemes
 {
-    n               (1 NSLOTS 1);
-    delta           0.001;
+    default backward;
 }
 
-distributed     no;
+gradSchemes
+{
+    default leastSquares;
+}
 
-roots
-(
-);
+divSchemes
+{
+    default none;
+    div(phi,U)   Gauss linearUpwind cellLimited leastSquares 1;
+}
+
+laplacianSchemes
+{
+    default none;
+    laplacian(nu,U) Gauss linear skewCorrected 1;
+    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
+    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
+}
+
+interpolationSchemes
+{
+    default linear;
+    interpolate(U) skewCorrected linear;
+}
+
+snGradSchemes
+{
+    default skewCorrected 1;
+}
+
+fluxRequired
+{
+    default no;
+    p;
+}
 
 
 // ************************************************************************* //

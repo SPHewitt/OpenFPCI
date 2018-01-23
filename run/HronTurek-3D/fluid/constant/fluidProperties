@@ -10,27 +10,24 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      decomposeParDict;
+    object      fluidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains NSLOTS;
+fluidSolver consistentIcoFluid;
+//fluidSolver icoFluid;
 
-method          simple;
-
-globalFaceZones ( plateZone );
-
-simpleCoeffs
+icoFluidCoeffs
 {
-    n               (1 NSLOTS 1);
-    delta           0.001;
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+    nOuterCorrectors 1;
 }
 
-distributed     no;
-
-roots
-(
-);
-
+consistentIcoFluidCoeffs
+{
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+}
 
 // ************************************************************************* //

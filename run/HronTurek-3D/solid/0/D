@@ -9,28 +9,35 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      decomposeParDict;
+    class       volVectorField;
+    object      D;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains NSLOTS;
+dimensions      [0 1 0 0 0 0 0];
 
-method          simple;
+internalField   uniform (0 0 0);
 
-globalFaceZones ( plateZone );
-
-simpleCoeffs
+boundaryField
 {
-    n               (1 NSLOTS 1);
-    delta           0.001;
+    plate
+    {
+        type            tractionDisplacement;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    plateFix
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
 }
-
-distributed     no;
-
-roots
-(
-);
 
 
 // ************************************************************************* //

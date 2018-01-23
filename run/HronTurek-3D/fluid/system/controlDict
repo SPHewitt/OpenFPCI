@@ -28,13 +28,13 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         2.1;
+endTime         50;
 
 deltaT          1e-3;
 
 writeControl    timeStep;
 
-writeInterval   10;
+writeInterval   5;
 
 purgeWrite      0;
 
@@ -56,26 +56,26 @@ maxCo           0.2;
 
 functions
 (
-   pointHistory
-   {
-       type pointHistory;
-       functionObjectLibs
-       (
-         "libpointHistory.so"
-       );
+//   pointHistory
+//   {
+//       type pointHistory;
+//       functionObjectLibs
+//       (
+//         "libpointHistory.so"
+//       );
 
-        region solid;
-        refHistoryPoint (0.6 0.2 0.025334);
-   }
+//        region solid;
+//        refHistoryPoint (0.6 0.2 0.025334);
+//   }
 
-   hronTurekReport
-   {
-       type hronTurekReport;
-       functionObjectLibs
-       (
-         "libhronTurekReport.so"
-       );
-   }
+//   hronTurekReport
+//   {
+//       type hronTurekReport;
+//       functionObjectLibs
+//       (
+//         "libhronTurekReport.so"
+//       );
+//   }
 );
 
 

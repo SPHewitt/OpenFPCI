@@ -16,13 +16,13 @@ FoamFile
 
 numberOfSubdomains NSLOTS;
 
-method          simple;
+method          metis;
 
 globalFaceZones ( plateZone );
 
 simpleCoeffs
 {
-    n               (1 NSLOTS 1);
+    n               (NSLOTS 1 1);
     delta           0.001;
 }
 

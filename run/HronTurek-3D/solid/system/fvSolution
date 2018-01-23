@@ -10,27 +10,33 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      decomposeParDict;
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains NSLOTS;
-
-method          simple;
-
-globalFaceZones ( plateZone );
-
-simpleCoeffs
+solvers
 {
-    n               (1 NSLOTS 1);
-    delta           0.001;
+    D
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
 }
 
-distributed     no;
+relaxationFactors
+{
+    fields
+    {
+        D 1;
+    }
 
-roots
-(
-);
+    equations
+    {
+        // D 1;
+    }
+}
 
 
 // ************************************************************************* //

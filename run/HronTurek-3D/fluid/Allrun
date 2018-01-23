@@ -32,6 +32,6 @@ cd ..
 
 cd fluid
 
-#runApplication $application &
+runApplication $application &
 
 # ----------------------------------------------------------------- end-of-file
