@@ -194,10 +194,9 @@
   REAL(iwp),INTENT(INOUT)   :: Dfield(ntot,nels_pp),Ufield(ntot,nels_pp)
   REAL(iwp),INTENT(INOUT)   :: Afield(ntot,nels_pp), val(ndim,loaded_nodes)
 
-  REAL(iwp)                 :: up,alpha1,beta1,theta
+  REAL(iwp)                 :: up
   REAL(iwp)                 :: e,v,rho,det,tol, maxdiff, tol2, detF
   REAL(iwp)                 :: energy, energy1, rn0
-  REAL(iwp)                 :: c1,c2,c3,c4
   REAL(iwp)                 :: a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10
   REAL(iwp)                 :: dtim,beta,delta,alpha
 
@@ -209,7 +208,6 @@
   CHARACTER(LEN=50)         :: argv
 
   INTEGER :: argc, iargc
-  INTEGER :: fixed_nodes, numfix_pp, fixdim, writetimes=0
  
   LOGICAL :: converged, timewrite=.TRUE.
 
@@ -220,40 +218,34 @@
 
   REAL(iwp),SAVE,ALLOCATABLE  :: points(:,:),coord(:,:),weights(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: r_pp(:),xnew_pp(:),bee(:,:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: diag_precon_pp(:),load_value(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: diag_precon_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: diag_precon_tmp(:,:), storekm_pp(:,:,:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: disp(:,:),g_coord(:,:),val_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: disp_pp(:,:), res_pp(:),fint_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: res_pp(:),fint_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: kmat_elem(:,:), kgeo_elem(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: xnewel_pp(:,:), jacF(:,:),auxm(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: derivFtran(:,:), derivF(:,:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: beeF(:,:), rightCG(:,:), defE(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: beeF(:,:), defE(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: cmat(:,:,:,:), sigma(:,:), cspa(:,:,:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: sigma1C(:), storefint_pp(:,:), deeF(:,:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: geomH(:,:), fixed_value(:), fixval_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: jacFinv(:,:), piolaS(:,:),fixvalpiece_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: elemdisp(:), fextpiece_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: geomH(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: piolaS(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: fextpiece_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: fext_pp(:), deltax_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: value_shape(:),xnewnodes_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: stress_integral_pp(:,:), stressnodes_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: principal_integral_pp(:,:), princinodes_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: principal(:), reacnodes_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: loads_pp(:),x1_pp(:),d1x1_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: d2x1_pp(:),x0_pp(:),d1x0_pp(:),d2x0_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: vu_pp(:),p_pp(:),d_pp(:),x_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: x1_pp(:),d1x1_pp(:),d2x1_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: x0_pp(:),d1x0_pp(:),d2x0_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: vu_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: pmul_pp(:,:),utemp_pp(:,:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: temp(:),d1temp(:),d2temp(:),temp_pp(:,:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: temp_pp(:,:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: vel_pp(:),acel_pp(:),eld_pp(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: fext_o_pp(:),shape_integral_pp(:,:)
 
   REAL(iwp),SAVE,ALLOCATABLE  :: fun(:),emm(:,:),ecm(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: d2x1_ppstar(:),meff_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:),points_r(:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:)
 
  
-  INTEGER,SAVE,ALLOCATABLE  :: num(:),load_node(:),nf_pp(:,:),no_pp(:)             
-  INTEGER,SAVE,ALLOCATABLE  :: comp(:,:),fixed_node(:), fixed_dof(:)
-  INTEGER,SAVE,ALLOCATABLE  :: fixelem_pp(:), fixdof_pp(:)
+  INTEGER,SAVE,ALLOCATABLE  :: num(:)           
+  INTEGER,SAVE,ALLOCATABLE  :: comp(:,:)
 
  
 !------------------------------------------------------------------------------
@@ -269,12 +261,11 @@
   argv       =  "Case"       ! Name files write to
   nlen       =  4            ! Length of Name
   nip        =  8            ! Number of Integration Points
-  limit      =  1000         ! Max number of Interation in PCG
+  limit      =  3000         ! Max number of Interation in PCG
   tol        =  1.0e-8       ! Tolerance of PCG loop
   element    =  "hexahedron" ! Element Name
 
   num_load_steps = 1         ! Number of load steps		
-  fixed_nodes    = 0         ! Number of restrained degrees of freedom
                              ! with a non-zero applied value
 
   tol2 = 1.0e-16             ! Tolerance for Newton-Raphson loop
@@ -282,18 +273,10 @@
   dimH = 8		     ! NOT SURE WHAT THIS VARIABLE DOES
   
   ! Set Numerical and Material Values 
-  alpha1  =  num_var(1)
-  beta1   =  num_var(2)
-  theta   =  num_var(3)
+  alpha   =  num_var(1)
+  delta   =  num_var(2)
+
   dtim    =  timeStep
-  !dtim	  =  num_var(4)  
-
-  !IF(numpe .EQ. 1)PRINT*,"Time Step: ",dtim
-
-  c1	    =  (1._iwp-theta)*dtim
-  c2	    =  beta1-c1
-  c3	    =  alpha1+1._iwp/(theta*dtim);
-  c4	    =  beta1+theta*dtim
 
   ! Youndgs ModulusPoissons Ratio and Density
 
@@ -329,9 +312,6 @@
     ALLOCATE(d2x1_pp(0:neq_pp))
 
     ALLOCATE(vu_pp(0:neq_pp))
-    ALLOCATE(d_pp(0:neq_pp))
-    ALLOCATE(p_pp(0:neq_pp))
-    ALLOCATE(x_pp(0:neq_pp))
     ALLOCATE(meff_pp(0:neq_pp))
 
     ! Matricies
@@ -345,7 +325,6 @@
     ALLOCATE(weights(nip))
     ALLOCATE(timest(20))
 
-   !ALLOCATE(loads_pp(0:neq_pp))
    !ALLOCATE(fext_o_pp(neq_pp))
    !fext_o_pp  =  zero
   ENDIF
@@ -353,10 +332,12 @@
   !---- Clean Arrays ------
 
   x0_pp    =  0._iwp;    d1x0_pp =  0._iwp;
-  vu_pp    =  0._iwp;    d2x0_pp =  0._iwp; 
+  d2x0_pp  =  0._iwp;
+ 
   d1x1_pp  =  0._iwp;    d2x1_pp =  0._iwp;
-  d_pp	   =  0._iwp;    p_pp    =  0._iwp;    
-  x_pp     =  0._iwp;    x1_pp   =  0._iwp;  
+  x1_pp    =  0._iwp;
+
+  vu_pp    =  0._iwp;    
 
       
   IF(.NOT.ALLOCATED(coord))THEN
@@ -366,9 +347,6 @@
     ALLOCATE(coord(nod,ndim))
     ALLOCATE(bee(nst,ntot))
     ALLOCATE(num(nod))
-    !ALLOCATE(load_value(ndim,loaded_nodes))
-    !ALLOCATE(load_node(loaded_nodes))
-    ALLOCATE(nf_pp(nodof,nn_pp))
     ALLOCATE(storekm_pp(ntot,ntot,nels_pp))
     ALLOCATE(storemm_pp(ntot,ntot,nels_pp))
     ALLOCATE(kmat_elem(ntot,ntot))
@@ -377,11 +355,9 @@
     ALLOCATE(comp(nod,ndim))
     ALLOCATE(jacF(ndim,ndim))
     ALLOCATE(auxm(nod,ndim))
-    ALLOCATE(jacFinv(ndim,ndim))
     ALLOCATE(derivFtran(nod,ndim))
     ALLOCATE(derivF(ndim,nod))
     ALLOCATE(beeF(nst,ntot))
-    ALLOCATE(rightCG(ndim,ndim))
     ALLOCATE(defE(ndim,ndim))
     ALLOCATE(piolaS(ndim,ndim))
     ALLOCATE(cmat(ndim,ndim,ndim,ndim))
@@ -391,11 +367,7 @@
     ALLOCATE(storefint_pp(ntot,nels_pp))
     ALLOCATE(deeF(nst,nst))
     ALLOCATE(geomH(dimH,dimH))
-    ALLOCATE(principal(ndim))
-    ALLOCATE(elemdisp(ntot))
-    ALLOCATE(value_shape(nod))
     ALLOCATE(points(ndim,nip))
-    ALLOCATE(points_r(nip,ndim))
   ENDIF
 
 !------------------------------------------------------------------------------
@@ -407,29 +379,17 @@
 !------------------------------------------------------------------------------
 ! 4. Set Loads
 !------------------------------------------------------------------------------
-   !fext_pp =  0._iwp
-   fext_pp = zero
 
-  ! Load fext_pp based on global load vector
+  fext_pp = zero
 
   CALL load(g_g_pp,g_num_pp,node,val,fext_pp(1:))
-  !CALL load_2((nn_start,g_num_pp,node,val,nf_pp,fext_pp(1:))
- 
-  CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
-  !IF(numpe .EQ. 1)PRINT*,"Gravity Loads: ",SUM_P(gravlo)  
+  CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   
   fext_pp(1:) = fext_pp(1:) + gravlo
  
   fextpiece_pp(1:) = fext_pp(1:)/FLOAT(num_load_steps)
   
-!------------------------------------------------------------------------------
-! 4. Read and distribute essential boundary conditions
-!------------------------------------------------------------------------------
-
-  numfix_pp = 0
-  ! SEE xx7 for this section
-  ! USE of FIXED_NODES 
 !------------------------------------------------------------------------------
 ! 5. Set Initial Conditions
 !------------------------------------------------------------------------------
@@ -446,17 +406,13 @@
 
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
-  !vu_pp      =  0._iwp
-  !loads_pp   =  zero
-  !pmul_pp    =  zero
-  !temp_pp    =  zero
+
 
 !-------------------------------------------------------------------------
 ! 7. Initialise the solution vector to 0.0
 !-------------------------------------------------------------------------
   
   ! U_n = U
-  xnew_pp = 0._iwp
   xnew_pp = x0_pp
 
   ! Vector comp to compute F (gradient of deformation)
@@ -474,12 +430,9 @@
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 
- num_load_steps=1
-
   DO iload = 1,num_load_steps    
     converged = .FALSE.
    
-   ! Commented to check validity
    fext_pp(1:) = FLOAT(iload)*fextpiece_pp(1:)
     
 !------------------------------------------------------------------------------
@@ -492,12 +445,13 @@
       storefint_pp = 0._iwp
 
       xnewel_pp = zero
+
       CALL GATHER(xnew_pp(1:),xnewel_pp)
 
 
-  !-------------------------------------------------------------------------
-  ! x. Build Matricies (K , M , f_int)
-  !-------------------------------------------------------------------------
+!-------------------------------------------------------------------------
+! x. Build Matricies (K , M , f_int)
+!-------------------------------------------------------------------------
   ! Clean [K] and [M] 
   storekm_pp  =  zero
   storemm_pp  =  zero
@@ -506,9 +460,8 @@
         kmat_elem = 0._iwp
         kgeo_elem = 0._iwp
         DO i = 1,nod
-          num(i) = g_num_pp(i,iel) !- nn_start + 1
+          num(i) = g_num_pp(i,iel)
         END DO
-        !coord = TRANSPOSE(g_coord_pp(:,:,iel))
         coord = g_coord_pp(:,:,iel)
         auxm(:,1) = xnewel_pp(comp(:,1),iel)
         auxm(:,2) = xnewel_pp(comp(:,2),iel)
@@ -548,6 +501,7 @@
 
         ! Mass Matrix	   
         fun = zero
+
 	! BUG: shape_Fun in shared/new_library.f90
         ! Line 253
         ! ndim = UBOUND(points,2) -> ndim = UBOUND(points,1)
@@ -577,7 +531,6 @@
 
         END DO ! Gauss Points
 
-
 	! k = k_l + k_nl
         storekm_pp(:,:,iel) = kmat_elem(:,:) + kgeo_elem(:,:)
 
@@ -586,50 +539,33 @@
 
       END DO ! nels_pp
  
-
       ! F_int
       fint_pp(:) = .0_iwp
       CALL SCATTER(fint_pp(1:),storefint_pp)
 
 !-------------------------------------------------------------------------
-! X. Get residual
+! X. Newmark Scheme
 !-------------------------------------------------------------------------
 
-      !r_pp(1:) = fext_pp(1:) - fint_pp(1:)       !Residual
-      !r_pp(0) = .0_iwp
-	  
-      ! Compute maxdiff of residual 
-      !maxdiff =  MAXABSVAL_P(r_pp(1:))
-
-      ! Normalise residual vector and stiffness matrix for pcg
-      !IF (maxdiff == 0.0) THEN
-      !  EXIT
-      !END IF
-
-!-------------------------------------------------------------------------
-! X. Set Newmark Parameters
-!-------------------------------------------------------------------------
-
-     alpha = 0.25
-     beta = 0.0
-     delta = 0.5
-
-     a0 = 1.0/(alpha*(dtim**2.0))
-     a1 = zero
-     a2 = 1.0/(alpha*dtim)
-     a3 = (1.0/( 2.0*alpha)) -1.0
-     a4 = zero
-     a5 = zero
-     a6 = 1.0/(alpha*(dtim**2.0))
-     a7 = -1.0/(alpha*dtim)
-     a8 = -( (1.0/(2.0*alpha) ) -1.0)
-     a9 = dtim*(1-delta)
+    ! New mark parameters
+     a0  = 1.0/(alpha*(dtim**2.0))
+     a1  = zero
+     a2  = 1.0/(alpha*dtim)
+     a3  = (1.0/( 2.0*alpha)) -1.0
+     a4  = zero
+     a5  = zero
+     a6  = 1.0/(alpha*(dtim**2.0))
+     a7  = -1.0/(alpha*dtim)
+     a8  = -( (1.0/(2.0*alpha) ) -1.0)
+     a9  = dtim*(1-delta)
      a10 = delta*dtim
 
      ! M_eff
      meff_pp = zero
      meff_pp(1:) = a0*(x0_pp(1:)-xnew_pp(1:)) + a2*d1x0_pp(1:) +a3*d2x0_pp(1:)
 
+     temp_pp    =  zero
+     
      temp_pp = storemm_pp
      pmul_pp = zero
 
@@ -642,10 +578,24 @@
      END DO
 
      vu_pp = zero
-     CALL scatter(vu_pp(1:),utemp_pp)
+     CALL SCATTER(vu_pp(1:),utemp_pp)
 
+!-------------------------------------------------------------------------
+! X. Get residual
+!-------------------------------------------------------------------------
+
+     ! {r_pp}
      r_pp(1:) = fext_pp(1:) - fint_pp(1:) + vu_pp(1:)
 
+     ! Compute maxdiff of residual 
+     maxdiff =  MAXABSVAL_P(r_pp(1:))
+
+     ! Normalise residual vector and stiffness matrix for pcg
+     IF (maxdiff == 0.0) THEN
+       EXIT
+     END IF
+
+     ! [k]
      storekm_pp = storekm_pp + a0*storemm_pp
 
 !-------------------------------------------------------------------------
@@ -658,12 +608,9 @@
         END DO
       END DO
   
-!     Input: diag_precon_tmp r(ntot,nels_pp): Diagonal preconditioner at 
-!                                             element level
       diag_precon_pp(:) = .0_iwp
       CALL SCATTER(diag_precon_pp(1:),diag_precon_tmp)
 
-!     Output: diag_precon_pp r(1:neq_pp) Diagonal preconditioner assembled
 
       diag_precon_pp(1:) = 1._iwp/diag_precon_pp(1:)
       diag_precon_pp(0)  = .0_iwp
@@ -675,20 +622,23 @@
       res_pp    = r_pp
 
       ! Include dynamic Effects
+      CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
       CALL PCG_VER1(inewton,limit,tol,storekm_pp,r_pp(1:), &
                     diag_precon_pp(1:),rn0,deltax_pp(1:),iters)
+
+      ! To ensure completion of PCG
+      CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
       !IF(numpe .EQ. 1)WRITE(*,'(2(a,I3))'),"N-R: ",inewton," PCG iters: ",iters
 
       xnew_pp(1:) = xnew_pp(1:) + deltax_pp(1:)
       xnew_pp(0) = .0_iwp
 
-!---------------------------------------------------------------------------
-!---------------------------------------------------------------------------
-!---------------------------------------------------------------------------
+!-------------------------------------------------------------------------
+! X. Check convergence for Newton-Raphson iterations
+!-------------------------------------------------------------------------
 
-! Check convergence for Newton-Raphson iterations 
       energy = ABS(DOT_PRODUCT_P(res_pp(1:),deltax_pp(1:)))
       IF (inewton==1) THEN
        energy1 = energy
@@ -702,7 +652,7 @@
         END IF 
       END IF 
 
-      IF(converged .OR. inewton==100) THEN
+      IF(converged .OR. inewton==20) THEN
         EXIT
       END IF
 
@@ -711,6 +661,10 @@
    IF(numpe .EQ. 1)WRITE(*,'(a,I3)')," Newton-Raphson Iters: ",inewton
  
   END DO !iload
+
+!-------------------------------------------------------------------------
+! X. Update Velocity and Acceleration
+!-------------------------------------------------------------------------
 
    x1_pp=zero; d2x1_ppstar= zero; d1x1_pp= zero; d2x1_pp=zero;
  
@@ -721,12 +675,6 @@
    d1x1_pp(1:)     = d1x0_pp(1:) + a9*d2x0_pp(1:) + a10*d2x1_ppstar(1:)
    d2x1_pp(1:)     = d2x1_ppstar(1:)
   
-   !x1_pp	=  xnew_pp
-   !d1x1_pp	=  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
-   !d2x1_pp	=  (d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta
-   !x0_pp	=  x1_pp;
-   !d1x0_pp	=  d1x1_pp
-   !d2x0_pp	=  d2x1_pp;
      
 !------------------------------------------------------------------------------
 ! 11. Gather Data from ntot,nels_pp to ndim,nodes_pp

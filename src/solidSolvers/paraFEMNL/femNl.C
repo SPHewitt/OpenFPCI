@@ -724,16 +724,19 @@ femNl::femNl(const fvMesh& mesh)
     g_g_pp_OF_ 	    =  new int [ntot*nels_pp_OF];
     g_coord_pp_OF_  =  new double [nod*ndim*nels_pp_OF];
 
-    double alpha1 (readScalar(solidProperties().lookup("alpha1")));
-    double beta1 (readScalar(solidProperties().lookup("beta1")));
-    double timestep (readScalar(solidProperties().lookup("timeStep")));
-    double theta (readScalar(solidProperties().lookup("theta")));
+    // Newmakrs method 
+
+    double beta (readScalar(solidProperties().lookup("beta")));
+    double delta (readScalar(solidProperties().lookup("delta")));
+    
+    //double timestep (readScalar(solidProperties().lookup("timeStep")));
+    //double theta (readScalar(solidProperties().lookup("theta")));
     
     numSchemes_ 	=  new double[4];
-    numSchemes_[0] 	=  alpha1;
-    numSchemes_[1] 	=  beta1;
-    numSchemes_[2] 	=  theta;
-    numSchemes_[3] 	=  timestep;
+    numSchemes_[0] 	=  beta;
+    numSchemes_[1] 	=  delta;
+    numSchemes_[2] 	=  0.0; //theta;
+    numSchemes_[3] 	=  0.0; //timestep;
 
     solidProps_ 	=  new double[3];
     solidProps_[0] 	=  E_;
@@ -1031,7 +1034,7 @@ tmp<vectorField> femNl::faceZonePointDisplacementIncrement
     if (globalZoneIndex != -1)
 //    if (false)
     {
-	//Info << "WARNING FIELDS ARE STORED ON EVERY PROCESSOR" << endl;
+	Info << "WARNING FIELDS ARE STORED ON EVERY PROCESSOR" << endl;
         // global face zone
 
         const labelList& curPointMap =
@@ -1096,6 +1099,7 @@ tmp<vectorField> femNl::faceZonePointDisplacementIncrement
             );
 
     }
+
     return tPointDisplacement;
 }
 
