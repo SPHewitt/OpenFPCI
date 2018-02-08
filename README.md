@@ -4,19 +4,19 @@ OpenFOAM-ParaFEM Coupling Interface:
 
 ## Motivation
 
-The package allows the coupling of a Finite Element Package ParaFEM to a Computational Fluid Dynamics package OpenFOAM-dev. The motivation is to provide a framework for which users can model Fluid Structure Interaction problems on High Performance Computing Systems.
+The package allows the coupling of a Finite Element Package ParaFEM to a Computational Fluid Dynamics package Foam-extend. The motivation is to provide a framework for which users can model Fluid Structure Interaction problems on High Performance Computing Systems.
 
 ## Description
 
-This package requires Foam-Extend, ParaFEM and an external Fluid Structure Interaction library. These can all be installed using the scripts provided or manually through the following websites.
+This package requires Foam-Extend, ParaFEM and an external Fluid Structure Interaction library. These can be installed through the following websites.
 
 ParaFEM: https://sourceforge.net/projects/parafem/
 
 Foam-Extend: https://openfoamwiki.net/index.php/Installation/Linux/foam-extend-4.0
 
-FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-structure_interaction
+FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-structure\_interaction
 
-The scripts to install these packages can be found in the src folder after dowloading the application, with instructions for this detailed below.
+In the src folder there are a series of scripts to install the pacakges above, however it is strongly advised to install both Foam-Extend and ParaFEM by hand. The openfpci.sh script can then be used to install, compile the FSI library along with the addittions required for the linking.
 
 ### Downloading the Code
 
@@ -24,7 +24,7 @@ The scripts to install these packages can be found in the src folder after dowlo
 git clone https://github.com/SPHewitt/OpenFPCI
 ```
 
-This repository contatins the files that couple OpenFOAM to ParaFEM. The scripts available in the src directory can be used to install Foam-Extend ParaFEM and OpenFPCI.
+This repository contatins the files that couple Foam-extend to ParaFEM. The scripts available in the src directory can be used to install Foam-Extend ParaFEM and OpenFPCI.
 
 The software installation has been tested on a number of systems, a linux desktop (Ubuntu 16.04), The Computational Shared Facility at Manchester and the SGI system in Leeds (Polaris). The instructions for these are as follows. The scripts use the system compilers and mpi packages, so correct modules and packages need to be loaded and installed. 
 
