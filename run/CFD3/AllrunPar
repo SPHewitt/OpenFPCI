@@ -1,0 +1,36 @@
+#!/bin/sh
+
+
+#--------------------------------------
+#        Input number of Procs     
+#--------------------------------------
+
+NSLOTS=$1
+
+if [ $# -eq 0 ]
+ then
+  echo "Specify Number of Subdomains"
+  exit
+fi
+
+
+# source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Get application name
+application=`getApplication`
+
+#--------------------------------------
+#               fluid     
+#--------------------------------------
+
+# Meshing fluid domain
+runApplication blockMesh
+
+sed s/NSLOTS/$NSLOTS/ ./system/decomposeParDict.orig > ./system/decomposeParDict
+runApplication decomposePar -cellDist
+
+runParallel $application $NSLOTS &
+
+# ----------------------------------------------------------------- end-of-file
+

@@ -1,0 +1,13 @@
+set terminal postscript enhanced color solid
+
+set output "drag.ps"
+set xlabel "Time, t [s]"
+set ylabel "Fx [m]"
+set grid
+
+set y2tics
+
+plot [9:9.6] "./history/0/force.dat" using 1:(-$2) axis x1y1 title "Ux" with lines
+
+#set output
+#set terminal x11

@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+NSLOTS=$1
+
+if [ $# -eq 0 ]
+ then
+  echo "AllrunPar runs in parallel"
+  echo "Specify Number of Subdomains to use"
+  exit
+fi
+
+
+# Get application name
+application=`getApplication`
+
+
+# Solid Domain
+runApplication -l log.blockMesh.solid blockMesh -case ../solid
+runApplication -l log.setSet.solid setSet -case ../solid -batch ../solid/setBatch
+runApplication -l log.setToZones.solid setsToZones -case ../solid -noFlipMap
+
+sed s/NSLOTS/$NSLOTS/g ../solid/system/decomposeParDict.orig > ../solid/system/decomposeParDict
+runApplication -l log.decomposePar.solid decomposePar -case ../solid -cellDist
+
+# Fluid Domain
+runApplication blockMesh
+#runApplication refineMesh -overwrite
+runApplication setSet -batch setBatch
+runApplication setsToZones -noFlipMap
+
+sed s/NSLOTS/$NSLOTS/g ./system/decomposeParDict.orig > ./system/decomposeParDict
+runApplication decomposePar -cellDist
+
+# Create Links
+cd ..
+
+./makeLinks fluid solid
+
+cd fluid
+
+
+# Run test Case
+
+runParallel $application $NSLOTS &
+
+# ----------------------------------------------------------------- end-of-file
+
