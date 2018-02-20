@@ -25,6 +25,8 @@ fvVectorMatrix UEqn
 
 if (momentumPredictor)
 {
-    solve(UEqn == -fvc::grad(p_));
+    //solve(UEqn == -fvc::grad(p_));
+    solve(UEqn == -gradp_);
+
 }
 

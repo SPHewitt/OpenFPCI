@@ -6,7 +6,7 @@
     phi_ = (fvc::interpolate(U_) & mesh.Sf());
          //+ (fvc::ddtPhiCorr(rUA_, U_, phi_));
 
-    adjustPhi(phi_, U_, p_);	
+    //adjustPhi(phi_, U_, p_);	
 
     for (int nonOrth=0; nonOrth<=nNonOrthCorr; nonOrth++)
     {
