@@ -1,3 +1,36 @@
+  !/****h* /parafemnl
+  !*  NAME
+  !*    parafemnl - Routines to solve 3D linear elastic 
+  !*                deformation using the large strain 
+  !*                assumption.
+  !*
+  !*  SYNOPSIS
+  !*    The group of subroutines makes up the routines required to
+  !*    solve the forced vibration of a 3D linear elastic solid
+  !*    assuming the material undergoes large strain. 
+  !*	
+  !*  FUNCTION
+  !*    These routines are based on the decomposition of program xx7 
+  !*    which is a development program being developed by "XXX" to 
+  !*    solve the forced vibration problems of materials using the
+  !*    large strain assumption 
+  !*    
+  !*    Subroutine           Purpose  	  
+  !*
+  !*    initnl                Generates initial matricies and arrays
+  !*    pop_gcoordpp          Populates g_coord_pp
+  !*    runnl                 Solves the governing equations
+  !*
+  !*  AUTHOR
+  !* 	  S.Hewitt
+  !*  COPYRIGHT
+  !*    (c) University of Manchester 1996-2017
+  !******
+  !*/
+
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
 
   SUBROUTINE initnl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,nn_pp,nn_start)
 

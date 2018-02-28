@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "femNl.H"
+#include "femLargeStrain.H"
 
 #include "volFields.H"
 #include "fvm.H"
@@ -53,7 +53,7 @@ namespace solidSolvers
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-tmp<volVectorField> femNl::residual
+tmp<volVectorField> femLargeStrain::residual
 (
     const volVectorField& source
 )
@@ -79,7 +79,7 @@ tmp<volVectorField> femNl::residual
 }
 
 
-void femNl::initialise
+void femLargeStrain::initialise
 (
     const volVectorField& sol,
     bool consistentBoundaryField
@@ -89,7 +89,7 @@ void femNl::initialise
 }
 
 
-scalar femNl::smooth
+scalar femLargeStrain::smooth
 (
     const volVectorField& source,
     label nCorrectors
@@ -100,7 +100,7 @@ scalar femNl::smooth
 }
 
 
-scalar femNl::smooth
+scalar femLargeStrain::smooth
 (
     const volVectorField& source,
     const volVectorField& refSolution,
@@ -111,7 +111,7 @@ scalar femNl::smooth
     return 0;
 }
 
-scalar femNl::residual() const
+scalar femLargeStrain::residual() const
 {
     return 0;
 }

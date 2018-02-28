@@ -23,10 +23,10 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    femNl
+    femLargeStrain
 
 Description
-   The femNl solver is a wrapper to integrate the ParaFEM fortran
+   The femLargeStrain solver is a wrapper to integrate the ParaFEM fortran
    routines into Foam-Extend. The routines solve the deformation for a
    linear elastic solid.
 
@@ -35,12 +35,12 @@ Authors
     Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
-    femNl.C
+    femLargeStrain.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef femNl_H
-#define femNl_H
+#ifndef femLargeStrain_H
+#define femLargeStrain_H
 
 #include "solidSolver.H"
 #include "volFields.H"
@@ -59,10 +59,10 @@ namespace solidSolvers
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class femNl Declaration
+                        Class femLargeStrain Declaration
 \*---------------------------------------------------------------------------*/
 
-class femNl
+class femLargeStrain
 :
     public solidSolver
 {
@@ -210,26 +210,26 @@ class femNl
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        femNl(const femNl&);
+        femLargeStrain(const femLargeStrain&);
 
         //- Disallow default bitwise assignment
-        void operator=(const femNl&);
+        void operator=(const femLargeStrain&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("femNl");
+    TypeName("femLargeStrain");
 
     // Constructors
 
         //- Construct from components
-        femNl(const fvMesh& mesh);
+        femLargeStrain(const fvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~femNl();
+        virtual ~femLargeStrain();
 
 
 

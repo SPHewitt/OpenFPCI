@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "femNl.H"
+#include "femSmallStrain.H"
 #include "volFields.H"
 #include "addToRunTimeSelectionTable.H"
 #include "tractionDisplacementFvPatchVectorField.H"
@@ -56,26 +56,18 @@ extern"C"
 
     // Initialises ParaFEM
     // Called at construction
-    void initnl_
+    void initl_
     (
         double* g_coord,	
+        int* g_num_pp,
         int* rest,
-        int* nn,
-        int* nr,
-        int* g_num_pp,
+        int* nn, 
+        const int* nels,
+        const int* nr,
+	double* SolidProperties,
         int* g_g_pp,
-	int* nn_pp,
-        int* nn_start
-    );
-
-    void pop_gcoordpp_
-    (
-	int* nn_pp,
-        int* nn_start,
-        double* g_coord,	
-        double* g_coord_pp,
-        int* g_num_pp,
-        int* nn
+	double* stiff,
+	double* mass
     );
 
     // return number of equations/proc 
@@ -98,6 +90,14 @@ extern"C"
 	int* numProcessors
     );
 
+    // Find the Diagonal preconditioner
+    void finddiagl_
+    (
+        double* stiff,
+	double* mass,
+	double* NumericalVariables,
+        double* precon
+    );
 
     // Print out the Force to Ensignt Format
     void checkforce_
@@ -110,20 +110,19 @@ extern"C"
     );
 
     // Solve the structural equation
-    void runnl_
+    void runl_
     (
-        int* node,
-        double* val, 
-	double* numVar,
-        double* matProp,
-        int* nr,
-        int* loadedNodes,
+	double* NumericalVariables,
+        double* f_ext, 
+        int* f_node,
+        int* solidPatchIDSize,
 	double* time,
-        int* nn_pp,
-	int* nn_start,
+        int* nn,
         int* g_g_pp,
         int* g_num_pp,
-        double* g_coord_pp,
+	double* stiff,
+	double* mass,
+        double* precon,
 	double* gravlo,
 	double* ptDtemp_,
 	double* ptUtemp_,
@@ -166,12 +165,12 @@ namespace solidSolvers
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(femNl, 0);
-addToRunTimeSelectionTable(solidSolver, femNl, dictionary);
+defineTypeNameAndDebug(femSmallStrain, 0);
+addToRunTimeSelectionTable(solidSolver, femSmallStrain, dictionary);
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-femNl::femNl(const fvMesh& mesh)
+femSmallStrain::femSmallStrain(const fvMesh& mesh)
 :
     solidSolver(typeName, mesh),
     mPoints_(NULL),
@@ -179,9 +178,9 @@ femNl::femNl(const fvMesh& mesh)
     numSchemes_(NULL),
     g_num_pp_OF_(NULL),
     g_g_pp_OF_(NULL),
-    g_coord_pp_OF_(NULL),
-    nn_pp_OF_(0),
-    nn_start_OF_(0),
+    store_km_pp_OF_(NULL),
+    store_mm_pp_OF_(NULL),
+    diag_precon_pp_OF_(NULL),
     gravlo_(NULL),
     numRestrNodes_(0),
     rest_(NULL),
@@ -384,7 +383,6 @@ femNl::femNl(const fvMesh& mesh)
 	mPoints_ 	=  new double [gPoints_*ndim];
     }
 
-
     // Populate mPoints
     pointIOField startPoints
     (
@@ -423,7 +421,6 @@ femNl::femNl(const fvMesh& mesh)
 
     // cellPoints() returns steering array
     const labelListList& cellPoints = mesh.cellPoints();
-
 
     label localIndex = 0;
  
@@ -587,7 +584,7 @@ femNl::femNl(const fvMesh& mesh)
     }
 
 //------------------------------------------------------------------------------
-//  ParaFEM: gnereating Restrained Array 
+//  ParaFEM: Generating Restrained Array 
 //------------------------------------------------------------------------------
 
     // Sort lists
@@ -621,31 +618,8 @@ femNl::femNl(const fvMesh& mesh)
     duplicateOrder(masterRest,duplicateNodes);
 
     // Copy Restrained labelList into rest_
-
-    numRestrNodes_ = 0;
-    // Recount number of restrained nodes:
-    forAll(masterRest,listI)
-    {
-        if (listI == 0)
-        {
-            numRestrNodes_++;
-            continue;
-        }
-
-        if (masterRest[listI][0] == masterRest[listI-1][0])
-        {
-	    // If exists continue
-	    continue;
-        }
-        else
-        {
-	    // If doesnt exist insert into rest
-            numRestrNodes_++;	
-        } 
-    }
-
-    //Info << "Number of Restrained Nodes: " << numRestrNodes_ << endl;
-
+    //numRestrNodes_ = numRestrNodes_ - duplicateNodes.size();
+    numRestrNodes_ = masterRest[numRestrNodes_-1][0];
     rest_ = new int [numRestrNodes_*4];
     restIndex = 0;
 
@@ -655,39 +629,18 @@ femNl::femNl(const fvMesh& mesh)
         rest_[i]=0.0;
     }
     
-    //Info << masterRest << endl; 
-
-    // Generating the Rest array is very buggy
-    // Currently masterRest is structured as follows
-    // node,x,y,z
-    // If a node lies on two patches it will exist twice
-    // It will exist in order such that the most fixed BC comes
-    // first i.e.
-    //  1 0 0 0
-    //  1 1 1 0
-    // In this situation we want to take the first set of values.
-
+    // Recount Number of Restrained Nodes
+    numRestrNodes_ = 0;
+    
     forAll(masterRest,listI)
     {
-	if (listI == 0)
+        if (listI != 0 && masterRest[listI][0] == masterRest[listI-1][0])
         {
-            // Insert first value
-            rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
-            rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
-            rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
-            rest_[ numRestrNodes_* 3 + restIndex ] =  masterRest[listI][3];
-            restIndex++;
             continue;
-        }
-        // For every value check if already exists
-        if (masterRest[listI][0] == masterRest[listI-1][0])
-        {
-	    // If exists continue
-	    continue;
         }
         else
         {
-	    // If doesnt exist insert into rest
+            numRestrNodes_++;
             rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
             rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
             rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
@@ -696,11 +649,9 @@ femNl::femNl(const fvMesh& mesh)
         }
     }
 
-    Info << "Number of Restrained Nodes: " << numRestrNodes_ << endl;
-
     // Debugging
     // Most Errors occur from boundary conditions 
-    if(true)
+    if(false)
     {
         fileName outputFile("rest.txt");
         OFstream os(db().time().system()/outputFile);
@@ -722,21 +673,19 @@ femNl::femNl(const fvMesh& mesh)
 //------------------------------------------------------------------------------
 
     g_g_pp_OF_ 	    =  new int [ntot*nels_pp_OF];
-    g_coord_pp_OF_  =  new double [nod*ndim*nels_pp_OF];
+    store_km_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
+    store_mm_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
 
-    // Newmakrs method 
-
-    double beta (readScalar(solidProperties().lookup("beta")));
-    double delta (readScalar(solidProperties().lookup("delta")));
-    
-    //double timestep (readScalar(solidProperties().lookup("timeStep")));
-    //double theta (readScalar(solidProperties().lookup("theta")));
+    double alpha1 (readScalar(solidProperties().lookup("alpha1")));
+    double beta1 (readScalar(solidProperties().lookup("beta1")));
+    double timestep (readScalar(solidProperties().lookup("timeStep")));
+    double theta (readScalar(solidProperties().lookup("theta")));
     
     numSchemes_ 	=  new double[4];
-    numSchemes_[0] 	=  beta;
-    numSchemes_[1] 	=  delta;
-    numSchemes_[2] 	=  0.0; //theta;
-    numSchemes_[3] 	=  0.0; //timestep;
+    numSchemes_[0] 	=  alpha1;
+    numSchemes_[1] 	=  beta1;
+    numSchemes_[2] 	=  theta;
+    numSchemes_[3] 	=  timestep;
 
     solidProps_ 	=  new double[3];
     solidProps_[0] 	=  E_;
@@ -750,39 +699,32 @@ femNl::femNl(const fvMesh& mesh)
 //  ParaFEM: Initialise ParaFEM
 //------------------------------------------------------------------------------
 
-    initnl_
+    initl_
     (
         mPoints_,
+        g_num_pp_OF_,
         rest_,
         &gPoints_,
+        &gCells_,
         &numRestrNodes_,
-        g_num_pp_OF_,
+        solidProps_,
         g_g_pp_OF_,
-	&nn_pp_OF_,
-        &nn_start_OF_
+        store_km_pp_OF_,
+	    store_mm_pp_OF_
     );
 
     reduce(tmp,sumOp<label>());
 
-    pop_gcoordpp_
-    (
-        &nn_pp_OF_,
-        &nn_start_OF_,
-        mPoints_,
-        g_coord_pp_OF_,
-        g_num_pp_OF_,
-        &gPoints_
-    );
-
     // Must follow initparafem
     const int neq_pp_OF = findneqpp_();
-   
+    diag_precon_pp_OF_ = new double [neq_pp_OF];
+    
+
 //------------------------------------------------------------------------------
 //  ParaFEM: Find Gravitry loading if set in dictionary
 //------------------------------------------------------------------------------
 
     double gravity(readScalar(solidProperties().lookup("gravity")));
-
     gravlo_ = new double [neq_pp_OF];
 
     if(gravity > 1e-6)
@@ -811,10 +753,16 @@ femNl::femNl(const fvMesh& mesh)
     {
     	for(int i=0;i<neq_pp_OF;i++)
     	{
-	    gravlo_[i]=0.0;
- 	}
+	        gravlo_[i]=0.0;
+ 	    }
     }
     
+
+//------------------------------------------------------------------------------
+//  ParaFEM: Find Diagonal Preconditioner
+//------------------------------------------------------------------------------
+
+    finddiagl_(store_km_pp_OF_,store_mm_pp_OF_,numSchemes_,diag_precon_pp_OF_);
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Force Arrays
@@ -945,12 +893,14 @@ femNl::femNl(const fvMesh& mesh)
 } // End Constructor
 
 
-femNl::~femNl()
+femSmallStrain::~femSmallStrain()
 {
+    delete[] store_km_pp_OF_;
+    delete[] store_mm_pp_OF_;
+    delete[] diag_precon_pp_OF_;
     delete[] solidProps_;
     delete[] g_num_pp_OF_;
     delete[] g_g_pp_OF_;
-    delete[] g_coord_pp_OF_;
     delete[] numSchemes_;
     delete[] forceNodes_;
     delete[] fext_OF_;
@@ -959,7 +909,7 @@ femNl::~femNl()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-vector femNl::pointU(label pointID) const
+vector femSmallStrain::pointU(label pointID) const
 {
     pointVectorField pointU
     (
@@ -981,7 +931,7 @@ vector femNl::pointU(label pointID) const
 }
 
 //- Patch point displacement
-tmp<vectorField> femNl::patchPointDisplacementIncrement
+tmp<vectorField> femSmallStrain::patchPointDisplacementIncrement
 (
     const label patchID
 ) const
@@ -1007,7 +957,7 @@ tmp<vectorField> femNl::patchPointDisplacementIncrement
 }
 
 //- Face zone point displacement
-tmp<vectorField> femNl::faceZonePointDisplacementIncrement
+tmp<vectorField> femSmallStrain::faceZonePointDisplacementIncrement
 (
     const label zoneID
 ) const
@@ -1034,7 +984,7 @@ tmp<vectorField> femNl::faceZonePointDisplacementIncrement
     if (globalZoneIndex != -1)
 //    if (false)
     {
-	Info << "WARNING FIELDS ARE STORED ON EVERY PROCESSOR" << endl;
+	//Info << "WARNING FIELDS ARE STORED ON EVERY PROCESSOR" << endl;
         // global face zone
 
         const labelList& curPointMap =
@@ -1099,12 +1049,11 @@ tmp<vectorField> femNl::faceZonePointDisplacementIncrement
             );
 
     }
-
     return tPointDisplacement;
 }
 
 //- Patch point displacement
-tmp<vectorField> femNl::patchPointDisplacement
+tmp<vectorField> femSmallStrain::patchPointDisplacement
 (
     const label patchID
 ) const
@@ -1131,7 +1080,7 @@ tmp<vectorField> femNl::patchPointDisplacement
 
 
 //- Face zone point displacement
-tmp<vectorField> femNl::faceZonePointDisplacement
+tmp<vectorField> femSmallStrain::faceZonePointDisplacement
 (
     const label zoneID
 ) const
@@ -1220,7 +1169,7 @@ tmp<vectorField> femNl::faceZonePointDisplacement
 }
 
 //- Patch face acceleration
-tmp<Foam::vectorField> femNl::patchFaceAcceleration
+tmp<Foam::vectorField> femSmallStrain::patchFaceAcceleration
 (
     const label patchID
 ) const
@@ -1242,7 +1191,7 @@ tmp<Foam::vectorField> femNl::patchFaceAcceleration
 }
 
 //- Patch face acceleration
-tmp<vectorField> femNl::faceZoneAcceleration
+tmp<vectorField> femSmallStrain::faceZoneAcceleration
 (
     const label zoneID,
     const label patchID
@@ -1279,7 +1228,7 @@ tmp<vectorField> femNl::faceZoneAcceleration
 
 
 //- Patch face acceleration
-tmp<vectorField> femNl::faceZoneVelocity
+tmp<vectorField> femSmallStrain::faceZoneVelocity
 (
     const label zoneID,
     const label patchID
@@ -1314,7 +1263,7 @@ tmp<vectorField> femNl::faceZoneVelocity
 
 
 //- Face zone point displacement
-tmp<tensorField> femNl::faceZoneSurfaceGradientOfVelocity
+tmp<tensorField> femSmallStrain::faceZoneSurfaceGradientOfVelocity
 (
     const label zoneID,
     const label patchID
@@ -1334,7 +1283,7 @@ tmp<tensorField> femNl::faceZoneSurfaceGradientOfVelocity
 
 
 tmp<vectorField> 
-femNl::currentFaceZonePoints(const label zoneID) const
+femSmallStrain::currentFaceZonePoints(const label zoneID) const
 {
     vectorField pointDisplacement
     (
@@ -1421,7 +1370,7 @@ femNl::currentFaceZonePoints(const label zoneID) const
 
 
 //- Face zone point displacement
-tmp<vectorField> femNl::faceZoneNormal
+tmp<vectorField> femSmallStrain::faceZoneNormal
 (
     const label zoneID,
     const label patchID
@@ -1487,7 +1436,7 @@ tmp<vectorField> femNl::faceZoneNormal
     return tNormals;
 }
 
-void femNl::setTraction
+void femSmallStrain::setTraction
 (
     const label patchID,
     const vectorField& traction
@@ -1499,7 +1448,7 @@ void femNl::setTraction
      != tractionDisplacementFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void femNl::setTraction(...)")
+        FatalErrorIn("void femSmallStrain::setTraction(...)")
             << "Bounary condition on " << D_.name() 
                 <<  " is " 
                 << D_.boundaryField()[patchID].type() 
@@ -1518,7 +1467,7 @@ void femNl::setTraction
     patchU.traction() = traction;
 }
 
-void femNl::setPressure
+void femSmallStrain::setPressure
 (
     const label patchID,
     const scalarField& pressure
@@ -1530,7 +1479,7 @@ void femNl::setPressure
      != tractionDisplacementFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void femNl::setTraction(...)")
+        FatalErrorIn("void femSmallStrain::setTraction(...)")
             << "Bounary condition on " << D_.name() 
                 <<  " is " 
                 << D_.boundaryField()[patchID].type() 
@@ -1549,7 +1498,7 @@ void femNl::setPressure
     patchU.pressure() = pressure;
 }
 
-void femNl::setTraction
+void femSmallStrain::setTraction
 (
     const label patchID,
     const label zoneID,
@@ -1575,7 +1524,7 @@ void femNl::setTraction
 
 
 
-void femNl::setPressure
+void femSmallStrain::setPressure
 (
     const label patchID,
     const label zoneID,
@@ -1601,7 +1550,7 @@ void femNl::setPressure
 
 
 //- Set traction at specified patch
-void femNl::setVelocityAndTraction
+void femSmallStrain::setVelocityAndTraction
 (
     const label patchID,
     const vectorField& traction,
@@ -1617,7 +1566,7 @@ void femNl::setVelocityAndTraction
     {
         FatalErrorIn
         (
-            "void femNl::"
+            "void femSmallStrain::"
             "setVelocityAndTraction(...)"
         )
             << "Bounary condition on " << D_.name() 
@@ -1641,7 +1590,7 @@ void femNl::setVelocityAndTraction
 }
    
 //- Set traction at specified patch
-void femNl::setVelocityAndTraction
+void femSmallStrain::setVelocityAndTraction
 (
     const label patchID,
     const label zoneID,
@@ -1685,7 +1634,7 @@ void femNl::setVelocityAndTraction
     );
 }
 
-tmp<vectorField> femNl::predictTraction
+tmp<vectorField> femSmallStrain::predictTraction
 (
     const label patchID,
     const label zoneID
@@ -1698,7 +1647,7 @@ tmp<vectorField> femNl::predictTraction
      != tractionDisplacementFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void femNl::setTraction(...)")
+        FatalErrorIn("void femSmallStrain::setTraction(...)")
             << "Bounary condition on " << D_.name() 
                 <<  " is " 
                 << D_.boundaryField()[patchID].type() 
@@ -1744,7 +1693,7 @@ tmp<vectorField> femNl::predictTraction
 }
 
 
-tmp<scalarField> femNl::predictPressure
+tmp<scalarField> femSmallStrain::predictPressure
 (
     const label patchID, 
     const label zoneID
@@ -1757,7 +1706,7 @@ tmp<scalarField> femNl::predictPressure
      != tractionDisplacementFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void femNl::setTraction(...)")
+        FatalErrorIn("void femSmallStrain::setTraction(...)")
             << "Bounary condition on " << D_.name() 
                 <<  " is " 
                 << D_.boundaryField()[patchID].type() 
@@ -1801,14 +1750,13 @@ tmp<scalarField> femNl::predictPressure
     return tpF;
 }
 
-bool femNl::evolve()
+bool femSmallStrain::evolve()
 {
     Info << "Evolving solid solver: " 
-        << femNl::typeName << endl;
+        << femSmallStrain::typeName << endl;
     
-    //label lPoints = mesh().points().size();
-    //double time = mesh().time().value();
-    double dtim = mesh().time().deltaTValue();
+    label lPoints = mesh().points().size();
+    double time = mesh().time().value();
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
@@ -1845,21 +1793,20 @@ bool femNl::evolve()
 //------------------------------------------------------------------------------
 //  ParaFEM: Run ParaFEM Code
 //------------------------------------------------------------------------------
-    runnl_
+    runl_
     (
-        forceNodes_,
-        fext_OF_,
 	numSchemes_,
-        solidProps_,
-        &numRestrNodes_,
+        fext_OF_,
+        forceNodes_,
         &numFixedForceNodes_,
-	&dtim,
-        &nn_pp_OF_,
-        &nn_start_OF_,
+	&time,	
+        &lPoints,
         g_g_pp_OF_,
         g_num_pp_OF_,
-        g_coord_pp_OF_,
-        gravlo_,
+        store_km_pp_OF_,
+	store_mm_pp_OF_,
+        diag_precon_pp_OF_,
+	gravlo_,
 	ptDtemp_,
 	ptUtemp_,
 	ptAtemp_
@@ -1890,9 +1837,9 @@ bool femNl::evolve()
     // Calculate Cauchy Green Stress Tensor
     {
 	D_ = pointToVol_.interpolate(pointD_);
-        //epsilon_ = symm(fvc::grad(D_));
+        epsilon_ = symm(fvc::grad(D_));
 
-        //sigma_ = 2*mu_*epsilon_ + I*(lambda_*tr(epsilon_));
+        sigma_ = 2*mu_*epsilon_ + I*(lambda_*tr(epsilon_));
     }
 
     //    U_ = pointToVol_.interpolate(pointU_); 
@@ -1900,7 +1847,7 @@ bool femNl::evolve()
     return true;
 }
 
-tmp<volScalarField> femNl::hydPressure() const
+tmp<volScalarField> femSmallStrain::hydPressure() const
 {
     tmp<volScalarField> tHydPressure
     (
@@ -1913,13 +1860,13 @@ tmp<volScalarField> femNl::hydPressure() const
     return tHydPressure;
 }
 
-void femNl::predict()
+void femSmallStrain::predict()
 {
     Info << "Predicting solid:" << endl;
     D_ = D_ + U_*runTime().deltaT();
 }
 
-void femNl::updateFields()
+void femSmallStrain::updateFields()
 {
     Info << "updateFields:" << endl;
 
@@ -1928,7 +1875,7 @@ void femNl::updateFields()
     lambda_ = rheology_.lambda();
 }
 
-tmp<surfaceVectorField> femNl::traction() const
+tmp<surfaceVectorField> femSmallStrain::traction() const
 {
     Info << "traction:" << endl;
     tmp<surfaceVectorField> tTraction
@@ -1943,7 +1890,7 @@ tmp<surfaceVectorField> femNl::traction() const
     return tTraction;
 }
 
-bool femNl::writeObject
+bool femSmallStrain::writeObject
 (
     IOstream::streamFormat,
     IOstream::versionNumber,

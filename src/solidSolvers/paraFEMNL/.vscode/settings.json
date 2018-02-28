@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "addtoruntimeselectiontable.h": "c",
-        "volfields.h": "c",
-        "velocitytractiondisplacementfvpatchvectorfield.h": "c",
-        "ostream": "c"
-    }
-}
