@@ -115,6 +115,9 @@ if [ -z ${FOAM_DIR} ]; then
   FOAM_DIR=$HOME/foam/foam-extend-$FOAMEXTEND_VERSION
 fi
 
+echo -e "FOAM_DIR="$FOAM_DIR
+echo "FOAM_DIR="$FOAM_DIR >> $logfile
+
 ############################################################
 # Compilation and Installation of OpenFPCI requirement (FSI)
 ############################################################
