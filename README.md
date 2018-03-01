@@ -44,6 +44,7 @@ Prerequisites:
 
 * OpenMPI: Version 1.6.5 .
 * GCC compilers: gcc 5.x .
+* Ubuntu 16.04
 
 ### Manchester Computational Facility
 
@@ -77,4 +78,4 @@ module swap gcc/6.3.0 gcc/5.3.0
 
 ## Contact
 
-For any assitance please contact sam.hewitt@manchester.ac.uk
+For any assistance please contact sam.hewitt@manchester.ac.uk
