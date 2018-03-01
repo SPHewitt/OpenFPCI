@@ -16,54 +16,65 @@ Foam-Extend: https://openfoamwiki.net/index.php/Installation/Linux/foam-extend-4
 
 FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-structure\_interaction
 
-In the src folder there are a series of scripts to install the pacakges above, however it is strongly advised to install both Foam-Extend and ParaFEM by hand. The openfpci.sh script can then be used to install, compile the FSI library along with the addittions required for the linking.
+The library represents a direct coupling between ParaFEM and Foam-Extend, through C++ wrappers around fortran parafem subroutines.
 
-### Downloading the Code
+## Installation
 
+Foam-Extend and ParaFEM must be downloaded and compiled prior to the installation of the OpenFPCI link. It is suggested that users follow the links provided above to install the relevent pacakges suitable for their systems. Once these packages have been compiled and installed the OpenFPCI can be downloaded using the following command: 
 ```
 git clone https://github.com/SPHewitt/OpenFPCI
 ```
 
-This repository contatins the files that couple Foam-extend to ParaFEM. The scripts available in the src directory can be used to install Foam-Extend ParaFEM and OpenFPCI.
+The third-party FSI library and OpenFPCI can be downloaded and compiled using the openfpci.sh script present in the src directory. The script assumes that both Foam-Extend and ParaFEM are installed in the home directory, i.e. $HOME/foam/foam-extend-X.X and $HOME/parafem-code/parafem. However if they are installed in different locations two inputs to the script are required:
 
-The software installation has been tested on a number of systems, a linux desktop (Ubuntu 16.04), The Computational Shared Facility at Manchester and the SGI system in Leeds (Polaris). The instructions for these are as follows. The scripts use the system compilers and mpi packages, so correct modules and packages need to be loaded and installed. 
+```
+cd src
+./openfpci.sh -f "/path/to/foam-extend.x.x" -p "/path/to/parafem-code/parafem"
+```
 
-### Compiling the code
+The software has been tested with Foam-Extend-4.0 and ParaFEM.5.0.3 on a linux desktop running Ubuntu 16.04. The code has further been proted to The Computational Shared Facility at Manchester, the SGI system in Leeds (Polaris), The XC30 Cray system in Ediburugh (Archer) and the Tianhe2 Machine in Guangzhou China.
 
-The FSI Library does not currently compile with gcc >= 6 so be careful when loading the gnu modules.
-
+The modules used on each of the systens is summarised below: 
 
 ### Linux Desktop
 
+On a linux desktop the code uses openmpi-1.6.5 if another mpi package exists i.e. mpich the script will fail.  
+
 Prerequisites:
 
-* OpenMPI: Version 1.6.5  has been tested.
-* GCC compilers: gcc 4.x  have been tested.
-
-```
-cd OpenFPCI
-
-./compile.sh
-```
+* OpenMPI: Version 1.6.5 .
+* GCC compilers: gcc 5.x .
 
 ### Manchester Computational Facility
 
-Instructuctions to be updated soon.
+The application has been tested with gnu/4.9.1 package and system openmpi version 1.6.5. The default compilers on the system are intel so these need to be swapped for the gnu compilers. 
+
+```
+module load mpi/gcc/openmpi/1.8-ib
+
+module load compilers/gcc/4.9.0
+```
 
 ### SGI - N8 Polaris (Leeds)
 
-The application has been tested with gnu/4.9.1 package and system openmpi version 1.6.5. The default compilers on the system are intel so these need to be swapped for the gnu compilers. The intel compilers can be used however instructions for this are not yet available.
+The application has been tested with gnu/4.9.1 package and system openmpi version 1.6.5. The default compilers on the system are intel so these need to be swapped for the gnu compilers.
 
 ```
 module swap intel/"version" gnu/4.9.1
 
 module load openmpi/1.6.5
 
-cd OpenFPCI
-
-./compile.sh
 ```
 
 ### XC30 -  Archer (Edinburgh)
 
-Instructions to be updated soon.
+```
+module swap PrgEnv-cray PrgEnv-gnu/5.1.29
+
+module swap gcc/6.3.0 gcc/5.3.0
+
+```
+
+## Contact
+
+For any assitance please contact sam.hewitt@manchester.ac.uk
