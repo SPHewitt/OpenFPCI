@@ -617,9 +617,28 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     labelList duplicateNodes;
     duplicateOrder(masterRest,duplicateNodes);
 
-    // Copy Restrained labelList into rest_
-    //numRestrNodes_ = numRestrNodes_ - duplicateNodes.size();
-    numRestrNodes_ = masterRest[numRestrNodes_-1][0];
+   // Recount number of restrained nodes    
+    numRestrNodes_ = 0;
+    forAll(masterRest,listI)
+    {
+        if (listI == 0)
+        {
+            numRestrNodes_++;
+            continue;
+        }
+
+        if (masterRest[listI][0] == masterRest[listI-1][0])
+        {
+            // If exists continue
+            continue;
+        }
+        else
+        {
+            // If doesnt exist insert into rest
+            numRestrNodes_++;
+        }
+    }
+
     rest_ = new int [numRestrNodes_*4];
     restIndex = 0;
 
@@ -628,10 +647,8 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     {
         rest_[i]=0.0;
     }
-    
-    // Recount Number of Restrained Nodes
-    numRestrNodes_ = 0;
-    
+
+    // Populate rest array 
     forAll(masterRest,listI)
     {
         if (listI != 0 && masterRest[listI][0] == masterRest[listI-1][0])
@@ -640,7 +657,6 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
         }
         else
         {
-            numRestrNodes_++;
             rest_[ numRestrNodes_* 0 + restIndex ] =  masterRest[listI][0];
             rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
             rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];

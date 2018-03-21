@@ -620,10 +620,8 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     labelList duplicateNodes;
     duplicateOrder(masterRest,duplicateNodes);
 
-    // Copy Restrained labelList into rest_
-
+    // Recount number of restrained nodes    
     numRestrNodes_ = 0;
-    // Recount number of restrained nodes:
     forAll(masterRest,listI)
     {
         if (listI == 0)
@@ -644,8 +642,6 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         } 
     }
 
-    //Info << "Number of Restrained Nodes: " << numRestrNodes_ << endl;
-
     rest_ = new int [numRestrNodes_*4];
     restIndex = 0;
 
@@ -655,8 +651,6 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         rest_[i]=0.0;
     }
     
-    //Info << masterRest << endl; 
-
     // Generating the Rest array is very buggy
     // Currently masterRest is structured as follows
     // node,x,y,z
@@ -695,8 +689,6 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
             restIndex++;	
         }
     }
-
-    Info << "Number of Restrained Nodes: " << numRestrNodes_ << endl;
 
     // Debugging
     // Most Errors occur from boundary conditions 
@@ -1808,7 +1800,7 @@ bool femLargeStrain::evolve()
     
     //label lPoints = mesh().points().size();
     //double time = mesh().time().value();
-    double dtim = mesh().time().deltaTValue();
+    double dtim = runTime().deltaT().value();
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
