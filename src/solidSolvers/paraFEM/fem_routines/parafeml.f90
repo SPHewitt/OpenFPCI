@@ -1,4 +1,4 @@
-  !/****h* /parafeml
+  !/****h* solvers/parafeml
   !*  NAME
   !*    parafeml - Routines to solve 3D linear elastic 
   !*               deformation using the small strain assumption.
@@ -7,6 +7,13 @@
   !*    The group of subroutines makes up the routines required to
   !*    solve the forced vibration of a 3D linear elastic solid
   !*    assuming the material undergoes finite strain. 
+  !*
+  !*    The governing equations solved:
+  !*    
+  !*    [M]{a}+[C]{u}+[K]{d} = {f_t}
+  !*
+  !*    The equations are stepped through using the linear interpolation
+  !*    in time using theta.
   !*	
   !*  FUNCTION
   !*    These routines are based on the decomposition of program 12.9 
@@ -281,24 +288,10 @@
   ! Manual Switch to turn on/off .res file
   printres  =  1
   
-  IF(numpe==1 .AND. printres==1)THEN
-  CALL system_mem_usage(RSS,VM)
-  OPEN(11,FILE=argv(1:nlen)//".res",STATUS='REPLACE',ACTION='WRITE')
-    WRITE(11,'(A,I7,A)') "This job ran on ",npes," processes"
-    WRITE(11,'(A,3(I12,A))') "There are ",nn," nodes", nr, &
-                            " restrained and ",neq," equations"
-    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
-    WRITE(11,'(A,F10.4)') "Time to Populate g_coord/num_pp is:",timest(3)-timest(2)
-    WRITE(11,'(A,F10.4)') "Time to find_g & make_ggl:",timest(4)-timest(3)
-    WRITE(11,'(A,F10.4)') "Time to Build K and M:",timest(5)-timest(4)
-    WRITE(11,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
-    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
-    WRITE(11,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
-    WRITE(11,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
-    WRITE(11,'(A,I10)') "Total Virtual Memory(Kb): ",VM
-    WRITE(11,'(A,I10)') "Total RSS Memory (Kb): ",RSS
-  CLOSE(11)
-  END IF
+  !IF(numpe==1 .AND. printres==1)THEN
+    !CALL system_mem_usage(RSS,VM)
+    CALL WRITE_SMALL_STRAIN(argv,timest,iters)
+  !END IF
   
   DEALLOCATE(points,dee,jac,der,deriv,bee)
   DEALLOCATE(weights,ecm,emm,fun,g_coord_pp,timest)

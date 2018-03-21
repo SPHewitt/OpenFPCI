@@ -1,4 +1,4 @@
-  !/****h* /parafemutils
+  !/****h* parafemutils
   !*  NAME
   !*    parafemutils - Collection of fortran subroutines                          
   !*
@@ -29,6 +29,7 @@
   !*
   !*    writeToFile          Writes float field to file
   !*    writeToFileInt       Writes int field to file
+  !*    write_largestrain    Write out the data for femlargestrain.f90
   !*
   !*    system_mem_usage     Track Memory usage
   !* 
@@ -1039,6 +1040,233 @@
   CLOSE(fileNum)
 
   END SUBROUTINE writeToFileInt
+
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+
+  SUBROUTINE WRITE_LARGESTRAIN(job_name,nn,nr,loaded_nodes,timest,nr_timest,inewton,nr_iters)
+  !/****f* parafemnl/write_largestrain
+  !*  NAME
+  !*    SUBROUTINE: write_largestrain
+  !*
+  !*  SYNOPSIS
+  !*    Usage:      CALL write_largestrain(timest)
+  !*
+  !*  FUNCTION
+  !*    Master processor writes out brief details about the problem and 
+  !*    some performance data
+  !*
+  !*  INPUTS
+  !*
+  !*    The following dynamic real array has the INTENT(IN) attribute:
+  !*
+  !*    timest(:)              : Holds timing information
+  !*
+  !*  AUTHOR
+  !*    Sam Hewitt
+  !*
+  !*  CREATION DATE
+  !*    21.03.2018
+  !******
+  !*  Place remarks that should not be included in the documentation here.
+  !*
+  !*/  
+
+  USE mpi_wrapper;    USE precision;  USE global_variables; 
+  USE mp_interface;   USE input;      USE output; 
+  USE loading;        USE timing;     USE maths; 
+  USE gather_scatter; USE steering;   USE new_library;
+  USE large_strain;
+  
+  IMPLICIT NONE
+
+  CHARACTER(LEN=50), INTENT(IN)  :: job_name
+  INTEGER, INTENT(IN)            :: nn,nr,inewton
+  INTEGER, INTENT(IN)            :: loaded_nodes,nr_iters(inewton,1)
+  REAL(iwp), INTENT(IN)          :: timest(17)
+  REAL(iwp), INTENT(IN)          :: nr_timest(10,20)
+
+!------------------------------------------------------------------------------
+! 1. Local variables
+!------------------------------------------------------------------------------
+  
+  CHARACTER(LEN=50)              :: fname
+  INTEGER                        :: i          ! loop counter
+
+ PRINT*,SUM(nr_timest(:,6))
+ 
+  IF(numpe==1) THEN
+
+    fname       = job_name(1:INDEX(job_name, " ")-1) // ".res"
+    OPEN(11,FILE=fname,STATUS='REPLACE',ACTION='WRITE')     
+
+!------------------------------------------------------------------------------
+! 2. Write basic details about the problem
+!------------------------------------------------------------------------------
+
+    WRITE(11,'(/A)')   "BASIC JOB DATA                                  "     
+ 
+    WRITE(11,'(A,I12)')    "Number of processors used                   ",npes 
+    !WRITE(11,'(A,I12)')    "Number of nodes in the mesh                 ",nn
+    WRITE(11,'(A,I12)')    "Number of nodes that were restrained        ",nr
+    WRITE(11,'(A,I12)')    "Number of equations solved                  ",neq
+    IF(loaded_nodes > 0) THEN
+      WRITE(11,'(A,I12)')    "Number of loaded nodes                      ",   &
+                              loaded_nodes 
+    END IF
+!------------------------------------------------------------------------------
+! 3. Output timing data
+!------------------------------------------------------------------------------
+
+    WRITE(11,'(/3A)')   "PROGRAM SECTION EXECUTION TIMES                    ",&
+                        "SECONDS  ", "%TOTAL    "
+    WRITE(11,'(A,F12.6,F8.2)') "Load the Structure                          ",&
+                           timest(3)-timest(2),                               &
+                           ((timest(3)-timest(2))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Set Starting conditions                     ",&
+                           timest(4)-timest(3),                               &
+                           ((timest(4)-timest(3))/(timest(17)-timest(1)))*100  
+
+    WRITE(11,'(/A,I1,A)')   "NEWTON RAPHSON ITERATIONS (",inewton,")"
+    WRITE(11,'(/A)')   "PCG ITERATIONS "
+    DO i=1,inewton
+        WRITE(11,'(I4)') nr_iters(i,1)
+    ENDDO
+
+    WRITE(11,'(A,F12.6,F8.2)') "Gather Displacement Increment               ",&
+                           SUM(nr_timest(:,1)),                               &
+                           ((SUM(nr_timest(:,1)))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Build Stiffness and Mass Matricies          ",&
+                           SUM(nr_timest(:,2)),                               &
+                           ((SUM(nr_timest(:,2)))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Set internal Forces                         ",&
+                           SUM(nr_timest(:,3)),                               &
+                           ((SUM(nr_timest(:,3)))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Set Newmark and Residual                    ",&
+                           SUM(nr_timest(:,4)),                               &
+                           ((SUM(nr_timest(:,4)))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Build the preconditioner                    ",&
+                           SUM(nr_timest(:,5)),                               &
+                           ((SUM(nr_timest(:,5)))/(timest(17)-timest(1)))*100                             
+    WRITE(11,'(A,F12.6,F8.2)') "Solve equations                             ",&
+                           SUM(nr_timest(:,6)),                               &
+                          ((SUM(nr_timest(:,6)))/(timest(17)-timest(1)))*100 
+    WRITE(11,'(A,F12.6,F8.2)') "Check convergence                           ",&
+                           SUM(nr_timest(:,7)),                             &
+                          ((SUM(nr_timest(:,7)))/(timest(17)-timest(1)))*100
+    WRITE(11,'(/A,F12.6,F8.2)') "Total Time in N-R loop                      ",&
+                           timest(15)-timest(5),                               &
+                          ((timest(15)-timest(5))/(timest(17)-timest(1)))*100
+    WRITE(11,'(A,F12.6,F8.2)') "Update Velocity and Acceleration            ",&
+                            timest(16)-timest(15),                            &
+                          ((timest(16)-timest(15))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Gather Data to pass out                     ",&
+                            timest(17)-timest(16),                            &
+                          ((timest(17)-timest(16))/(timest(17)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,A/)')   "Total execution time                        ",&
+                          timest(17)-timest(1),"  100.00"
+    CLOSE(11)
+    
+  END IF
+  
+  RETURN
+
+  END SUBROUTINE WRITE_LARGESTRAIN
+
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+
+  SUBROUTINE WRITE_SMALLSTRAIN(job_name,timest,iters)
+  !/****f* parafemnl/write_smallstrain
+  !*  NAME
+  !*    SUBROUTINE: write_smallstrain
+  !*
+  !*  SYNOPSIS
+  !*    Usage:      CALL write_smallstrain(timest)
+  !*
+  !*  FUNCTION
+  !*    Master processor writes out brief details about the problem and 
+  !*    some performance data
+  !*
+  !*  INPUTS
+  !*
+  !*    The following dynamic real array has the INTENT(IN) attribute:
+  !*
+  !*    timest(:)              : Holds timing information
+  !*
+  !*  AUTHOR
+  !*    Sam Hewitt
+  !*
+  !*  CREATION DATE
+  !*    21.03.2018
+  !******
+  !*  Place remarks that should not be included in the documentation here.
+  !*
+  !*/  
+
+  USE mpi_wrapper;    USE precision;  USE global_variables; 
+  USE mp_interface;   USE input;      USE output; 
+  USE loading;        USE timing;     USE maths; 
+  USE gather_scatter; USE steering;   USE new_library;
+  USE large_strain;
+  
+  IMPLICIT NONE
+
+  CHARACTER(LEN=50), INTENT(IN)  :: job_name
+  REAL(iwp), INTENT(IN)          :: timest(8)
+  INTEGER,INTENT(IN)             :: iters
+
+!------------------------------------------------------------------------------
+! 1. Local variables
+!------------------------------------------------------------------------------
+
+  CHARACTER(LEN=50)              :: fname
+  INTEGER                        :: i          ! loop counter
+
+
+  IF(numpe==1) THEN
+
+    fname       = job_name(1:INDEX(job_name, " ")-1) // ".run"
+    OPEN(11,FILE=fname,STATUS='REPLACE',ACTION='WRITE')     
+
+!------------------------------------------------------------------------------
+! 2. Output timing data
+!------------------------------------------------------------------------------
+
+    WRITE(11,'(/3A)')   "PROGRAM SECTION EXECUTION TIMES                    ",&
+                        "SECONDS  ", "%TOTAL    "
+    WRITE(11,'(A,F12.6,F8.2)') "Load the Structure                          ",&
+                           timest(3)-timest(2),                               &
+                           ((timest(3)-timest(2))/(timest(8)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Set Starting conditions                     ",&
+                           timest(4)-timest(3),                               &
+                           ((timest(4)-timest(3))/(timest(8)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Set Displacement & Velocity                 ",&
+                            timest(5)-timest(4),                            &
+                          ((timest(5)-timest(4))/(timest(8)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)') "Build RHS                                   ",&
+                            timest(6)-timest(5),                            &
+                          ((timest(6)-timest(5))/(timest(8)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,F8.2)')"Solve Equations                             ",&
+                            timest(7)-timest(6),                            &
+                          ((timest(7)-timest(6))/(timest(8)-timest(1)))*100
+    WRITE(11,'(A,F12.6,F8.2)') "Gather data to pass out                     ",&
+                            timest(8)-timest(6),                            &
+                          ((timest(8)-timest(7))/(timest(8)-timest(1)))*100  
+    WRITE(11,'(A,F12.6,A/)')   "Total execution time                        ",&
+                          timest(8)-timest(1),"  100.00"
+
+    WRITE(11,'(A,12I3)')       "Number of Iterations                        ",&
+                            iters
+    CLOSE(11)
+    
+  END IF
+  
+  RETURN
+
+  END SUBROUTINE WRITE_SMALLSTRAIN
 
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------

@@ -1,4 +1,4 @@
-  !/****h* /parafemnl
+  !/****h* parafemnl
   !*  NAME
   !*    parafemnl - Routines to solve 3D linear elastic 
   !*                deformation using the large strain 
@@ -66,7 +66,7 @@
   LOGICAL                   :: initialised
  
 !----------------------------------------------------------------------
-! 3. Input and Initialisation
+! 2. Input and Initialisation
 !---------------------------------------------------------------------- 
 
   ! Degrees of Freedon per Element
@@ -98,7 +98,7 @@
   CALL setielstart() 
  
 !----------------------------------------------------------------------
-! 4. Populate g_num_pp
+! 3. Populate g_num_pp
 !----------------------------------------------------------------------
   
   ! Poulate the Steering matrix
@@ -111,7 +111,7 @@
 
    
 !----------------------------------------------------------------------
-! 5. Calculate g_g_pp
+! 4. Calculate g_g_pp
 !----------------------------------------------------------------------
 
   ! Rearrange the rest Array
@@ -212,6 +212,7 @@
   INTEGER,INTENT(INOUT)     :: g_num_pp(nod,nels_pp),node(loaded_nodes)
 
 
+  INTEGER                   :: printres
   INTEGER                   :: nels,nn,nip, nn_pp,nlen
   INTEGER                   :: nf_start, fmt=1, i, j, k, m
   INTEGER                   :: iters, limit, iel, nn_start
@@ -247,7 +248,7 @@
 !------------------------------------------------------------------------------
 ! 2. Declare dynamic arrays
 !------------------------------------------------------------------------------
-  REAL(iwp),SAVE,ALLOCATABLE  :: timest(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: timest(:),nr_timest(:,:)
 
   REAL(iwp),SAVE,ALLOCATABLE  :: points(:,:),coord(:,:),weights(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: r_pp(:),xnew_pp(:),bee(:,:)
@@ -277,7 +278,7 @@
   REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:)
 
  
-  INTEGER,SAVE,ALLOCATABLE  :: num(:)           
+  INTEGER,SAVE,ALLOCATABLE  :: num(:),nr_iters(:,:)         
   INTEGER,SAVE,ALLOCATABLE  :: comp(:,:)
 
  
@@ -304,6 +305,8 @@
   tol2 = 1.0e-16             ! Tolerance for Newton-Raphson loop
 
   dimH = 8		     ! NOT SURE WHAT THIS VARIABLE DOES
+
+  printres = 0               ! Write .res file
   
   ! Set Numerical and Material Values 
   alpha   =  num_var(1)
@@ -357,6 +360,10 @@
     ALLOCATE(fun(nod))
     ALLOCATE(weights(nip))
     ALLOCATE(timest(20))
+    ALLOCATE(nr_timest(10,20))
+    ALLOCATE(nr_iters(10,1))
+
+    printres=1
 
    !ALLOCATE(fext_o_pp(neq_pp))
    !fext_o_pp  =  zero
@@ -370,7 +377,9 @@
   d1x1_pp  =  0._iwp;    d2x1_pp =  0._iwp;
   x1_pp    =  0._iwp;
 
-  vu_pp    =  0._iwp;    
+  vu_pp    =  0._iwp;   
+
+  nr_timest = zero; 
 
       
   IF(.NOT.ALLOCATED(coord))THEN
@@ -403,15 +412,19 @@
     ALLOCATE(points(ndim,nip))
   ENDIF
 
+  timest        =  zero
+  timest(1)     =  elap_time()
+
 !------------------------------------------------------------------------------
-! 1. Get integration Gauss points and weights in the element
+! 4. Get integration Gauss points and weights in the element
 !------------------------------------------------------------------------------
 
   CALL GET_GAUSS_POINTS(element,points,weights)
 
 !------------------------------------------------------------------------------
-! 4. Set Loads
+! 5. Set Loads
 !------------------------------------------------------------------------------
+  timest(2)     =  elap_time()
 
   fext_pp = zero
 
@@ -424,10 +437,11 @@
   fextpiece_pp(1:) = fext_pp(1:)/FLOAT(num_load_steps)
   
 !------------------------------------------------------------------------------
-! 5. Set Initial Conditions
+! 6. Set Initial Conditions
 !------------------------------------------------------------------------------
+  timest(3)     =  elap_time()
 
-! - scatter_noadd has no barriers in the subroutine
+  ! Scatter_noadd has no barriers in the subroutine
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   CALL scatter_noadd(Dfield,x0_pp(1:))
 
@@ -439,11 +453,10 @@
 
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
-
-
 !-------------------------------------------------------------------------
 ! 7. Initialise the solution vector to 0.0
 !-------------------------------------------------------------------------
+  timest(4)     =  elap_time()
   
   ! U_n = U
   xnew_pp = x0_pp
@@ -463,6 +476,8 @@
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 
+  timest(5)     =  elap_time()
+
   DO iload = 1,num_load_steps    
     converged = .FALSE.
    
@@ -475,19 +490,23 @@
     iterations: DO
       inewton = inewton + 1
 
+      timest(7)     =  elap_time()
+
       storefint_pp = 0._iwp
-
       xnewel_pp = zero
-
       CALL GATHER(xnew_pp(1:),xnewel_pp)
 
+      timest(8)     =  elap_time()
+      nr_timest(inewton,1)= timest(8)-timest(7)
 
 !-------------------------------------------------------------------------
-! x. Build Matricies (K , M , f_int)
+! 8. Build Matricies (K , M , f_int)
 !-------------------------------------------------------------------------
-  ! Clean [K] and [M] 
-  storekm_pp  =  zero
-  storemm_pp  =  zero
+      timest(9)     =  elap_time()
+
+      ! Clean [K] and [M] 
+      storekm_pp  =  zero
+      storemm_pp  =  zero
 
       DO iel = 1,nels_pp
         kmat_elem = 0._iwp
@@ -571,13 +590,19 @@
         storemm_pp(:,:,iel)  =  emm
 
       END DO ! nels_pp
+
+      timest(10)     =  elap_time()
+      nr_timest(inewton,2)= timest(10)-timest(9)
  
       ! F_int
       fint_pp(:) = .0_iwp
       CALL SCATTER(fint_pp(1:),storefint_pp)
 
+      timest(11) = elap_time()
+      nr_timest(inewton,3)= timest(11)-timest(10)
+
 !-------------------------------------------------------------------------
-! X. Newmark Scheme
+! 9. Newmark Scheme
 !-------------------------------------------------------------------------
 
     ! New mark parameters
@@ -614,7 +639,7 @@
      CALL SCATTER(vu_pp(1:),utemp_pp)
 
 !-------------------------------------------------------------------------
-! X. Get residual
+! 10. Get residual
 !-------------------------------------------------------------------------
 
      ! {r_pp}
@@ -631,8 +656,11 @@
      ! [k]
      storekm_pp = storekm_pp + a0*storemm_pp
 
+     timest(12)     =  elap_time()
+     nr_timest(inewton,4)= timest(12)-timest(11)
+
 !-------------------------------------------------------------------------
-! X. Diagonal Preconditioner
+! 11. Diagonal Preconditioner
 !-------------------------------------------------------------------------
       diag_precon_tmp = .0_iwp
       DO iel = 1,nels_pp
@@ -648,6 +676,8 @@
       diag_precon_pp(1:) = 1._iwp/diag_precon_pp(1:)
       diag_precon_pp(0)  = .0_iwp
 
+      timest(13)     =  elap_time()
+      nr_timest(inewton,5)= timest(13)-timest(12)
 !---------------------------------------------------------------------------
 !------------------------------- Solve using PCG ---------------------------
 !---------------------------------------------------------------------------
@@ -660,6 +690,8 @@
       CALL PCG_VER1(inewton,limit,tol,storekm_pp,r_pp(1:), &
                     diag_precon_pp(1:),rn0,deltax_pp(1:),iters)
 
+      nr_iters(inewton,1)=iters
+
       ! To ensure completion of PCG
       CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
 
@@ -668,8 +700,11 @@
       xnew_pp(1:) = xnew_pp(1:) + deltax_pp(1:)
       xnew_pp(0) = .0_iwp
 
+      timest(14)     =  elap_time()
+      nr_timest(inewton,6)= timest(14)-timest(13)
+
 !-------------------------------------------------------------------------
-! X. Check convergence for Newton-Raphson iterations
+! 12. Check convergence for Newton-Raphson iterations
 !-------------------------------------------------------------------------
 
       energy = ABS(DOT_PRODUCT_P(res_pp(1:),deltax_pp(1:)))
@@ -692,12 +727,16 @@
     END DO iterations
    
    IF(numpe .EQ. 1)WRITE(*,'(a,I3)')," Newton-Raphson Iters: ",inewton
+
+   nr_timest(inewton,7)= elap_time()-timest(14)
  
   END DO !iload
 
 !-------------------------------------------------------------------------
-! X. Update Velocity and Acceleration
+! 13. Update Velocity and Acceleration
 !-------------------------------------------------------------------------
+
+   timest(15)     =  elap_time()
 
    x1_pp=zero; d2x1_ppstar= zero; d1x1_pp= zero; d2x1_pp=zero;
  
@@ -710,8 +749,9 @@
   
      
 !------------------------------------------------------------------------------
-! 11. Gather Data from ntot,nels_pp to ndim,nodes_pp
+! 14. Gather Data from ntot,nels_pp to ndim,nodes_pp
 !------------------------------------------------------------------------------
+   timest(16)     =  elap_time()
 
   IF(.NOT.ALLOCATED(eld_pp))THEN
    ALLOCATE(eld_pp(ntot,nels_pp))
@@ -736,6 +776,13 @@
   Afield=eld_pp
 
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
+
+  timest(17)     =  elap_time()
+
+  ! Write at Information Timestep XX
+  !IF(printres == 1)THEN
+    CALL WRITE_LARGESTRAIN(argv,nn,nr,loaded_nodes,timest,nr_timest,inewton,nr_iters)
+  !ENDIF
 
   END SUBROUTINE
 
