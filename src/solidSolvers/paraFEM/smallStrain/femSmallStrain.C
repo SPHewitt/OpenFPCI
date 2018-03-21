@@ -678,7 +678,8 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
 
     double alpha1 (readScalar(solidProperties().lookup("alpha1")));
     double beta1 (readScalar(solidProperties().lookup("beta1")));
-    double timestep (readScalar(solidProperties().lookup("timeStep")));
+    //double timestep (readScalar(solidProperties().lookup("timeStep")));
+    double timestep = mesh.time().deltaTValue();
     double theta (readScalar(solidProperties().lookup("theta")));
     
     numSchemes_ 	=  new double[4];
