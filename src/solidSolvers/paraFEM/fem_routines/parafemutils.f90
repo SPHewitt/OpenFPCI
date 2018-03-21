@@ -1253,7 +1253,7 @@
                             timest(7)-timest(6),                            &
                           ((timest(7)-timest(6))/(timest(8)-timest(1)))*100
     WRITE(11,'(A,F12.6,F8.2)') "Gather data to pass out                     ",&
-                            timest(8)-timest(6),                            &
+                            timest(8)-timest(7),                            &
                           ((timest(8)-timest(7))/(timest(8)-timest(1)))*100  
     WRITE(11,'(A,F12.6,A/)')   "Total execution time                        ",&
                           timest(8)-timest(1),"  100.00"
