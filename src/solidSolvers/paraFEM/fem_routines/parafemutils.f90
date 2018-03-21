@@ -1098,7 +1098,7 @@
  
   IF(numpe==1) THEN
 
-    fname       = job_name(1:INDEX(job_name, " ")-1) // ".res"
+    fname       = job_name(1:INDEX(job_name, " ")-1) // ".run"
     OPEN(11,FILE=fname,STATUS='REPLACE',ACTION='WRITE')     
 
 !------------------------------------------------------------------------------

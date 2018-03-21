@@ -288,10 +288,24 @@
   ! Manual Switch to turn on/off .res file
   printres  =  1
   
-  !IF(numpe==1 .AND. printres==1)THEN
-    !CALL system_mem_usage(RSS,VM)
-    CALL WRITE_SMALL_STRAIN(argv,timest,iters)
-  !END IF
+  IF(numpe==1 .AND. printres==1)THEN
+  CALL system_mem_usage(RSS,VM)
+  OPEN(11,FILE=argv(1:nlen)//".res",STATUS='REPLACE',ACTION='WRITE')
+    WRITE(11,'(A,I7,A)') "This job ran on ",npes," processes"
+    WRITE(11,'(A,3(I12,A))') "There are ",nn," nodes", nr, &
+                            " restrained and ",neq," equations"
+    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
+    WRITE(11,'(A,F10.4)') "Time to Populate g_coord/num_pp is:",timest(3)-timest(2)
+    WRITE(11,'(A,F10.4)') "Time to find_g & make_ggl:",timest(4)-timest(3)
+    WRITE(11,'(A,F10.4)') "Time to Build K and M:",timest(5)-timest(4)
+    WRITE(11,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
+    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
+    WRITE(11,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
+    WRITE(11,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
+    WRITE(11,'(A,I10)') "Total Virtual Memory(Kb): ",VM
+    WRITE(11,'(A,I10)') "Total RSS Memory (Kb): ",RSS
+  CLOSE(11)
+  END IF
   
   DEALLOCATE(points,dee,jac,der,deriv,bee)
   DEALLOCATE(weights,ecm,emm,fun,g_coord_pp,timest)
@@ -711,25 +725,12 @@
 ! 12. Print Runtime Information to File
 !------------------------------------------------------------------------------
 
-  IF(numpe==1 .AND. printres==1)THEN
-  CALL system_mem_usage(RSS,VM)
-  printres=0
-  OPEN(10,FILE=argv(1:nlen)//".run",STATUS='REPLACE',ACTION='WRITE')
-    WRITE(10,'(A,F10.4)') "Time to load:",timest(3)-timest(2)
-    WRITE(10,'(A,F10.4)') "Time to Set ICs:",timest(4)-timest(3)
-    WRITE(10,'(A,F10.4)') "Displacement & Velocity:",timest(5)-timest(4)    
-    WRITE(10,'(A,F10.4)') "Time to Build RHS:",timest(6)-timest(5)
-    WRITE(10,'(A,F10.4)') "Time to Solve using PCG:",timest(7)-timest(6)
-    WRITE(10,'(A,F10.4)') "Time to Gather Data:",timest(8)-timest(7)
-    WRITE(10,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
-    WRITE(10,'(A,F10.4)') "-------------------------------------------------"
-    WRITE(10,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
-    WRITE(10,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
-    WRITE(10,'(A,I10)') "Total Virtual Memory(Kb): ",VM
-    WRITE(10,'(A,I10)') "Total RSS Memory (Kb): ",RSS
-    CLOSE(10)
-  END IF
-  timest(11)=elap_time()
+  !IF(numpe==1 .AND. printres==1)THEN
+  !CALL system_mem_usage(RSS,VM)
+  !printres=0
+    CALL WRITE_SMALLSTRAIN(argv,timest,iters)
+  !END IF
+
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   END SUBROUTINE
 
