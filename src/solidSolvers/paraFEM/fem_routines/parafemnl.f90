@@ -322,11 +322,7 @@
  
   ! Allocate memory required for the time loop
   IF(.NOT.ALLOCATED(timest))THEN
-
-    IF(numpe .EQ. 1)PRINT*,"ALLOCATE : 1"
-
     ! Vectors{eqns}
-
     ALLOCATE(diag_precon_pp(0:neq_pp))
     ALLOCATE(r_pp(0:neq_pp))
     ALLOCATE(res_pp(0:neq_pp))
@@ -383,9 +379,6 @@
 
       
   IF(.NOT.ALLOCATED(coord))THEN
-
-    IF(numpe .EQ. 1)PRINT*,"ALLOCATE : 2"
-
     ALLOCATE(coord(nod,ndim))
     ALLOCATE(bee(nst,ntot))
     ALLOCATE(num(nod))

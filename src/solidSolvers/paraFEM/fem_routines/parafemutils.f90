@@ -1093,8 +1093,6 @@
   
   CHARACTER(LEN=50)              :: fname
   INTEGER                        :: i          ! loop counter
-
- PRINT*,SUM(nr_timest(:,6))
  
   IF(numpe==1) THEN
 
