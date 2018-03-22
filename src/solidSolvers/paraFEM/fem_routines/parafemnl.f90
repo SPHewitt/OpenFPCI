@@ -747,7 +747,8 @@
    timest(16)     =  elap_time()
 
   IF(.NOT.ALLOCATED(eld_pp))THEN
-   ALLOCATE(eld_pp(ntot,nels_pp))
+    ALLOCATE(eld_pp(ntot,nels_pp))
+    printres=1
   END IF
 
 
@@ -773,9 +774,9 @@
   timest(17)     =  elap_time()
 
   ! Write at Information Timestep XX
-  !IF(printres == 1)THEN
+  IF(printres == 1)THEN
     CALL WRITE_LARGESTRAIN(argv,nn,nr,loaded_nodes,timest,nr_timest,inewton,nr_iters)
-  !ENDIF
+  ENDIF
 
   END SUBROUTINE
 

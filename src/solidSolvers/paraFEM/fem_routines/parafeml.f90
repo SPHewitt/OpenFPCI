@@ -536,6 +536,8 @@
   c3	    =  alpha1+1._iwp/(theta*dtim);
   c4	    =  beta1+theta*dtim
   
+  printres=0
+ 
   ! Allocate memory required for the time loop
   IF(.NOT.ALLOCATED(timest))THEN
    CALL system_mem_usage(RSSa,VMa)
@@ -725,11 +727,11 @@
 ! 12. Print Runtime Information to File
 !------------------------------------------------------------------------------
 
-  !IF(numpe==1 .AND. printres==1)THEN
-  !CALL system_mem_usage(RSS,VM)
-  !printres=0
+  IF(numpe==1 .AND. printres==1)THEN
+    !CALL system_mem_usage(RSS,VM)
+    printres=0
     CALL WRITE_SMALLSTRAIN(argv,timest,iters)
-  !END IF
+  END IF
 
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   END SUBROUTINE
