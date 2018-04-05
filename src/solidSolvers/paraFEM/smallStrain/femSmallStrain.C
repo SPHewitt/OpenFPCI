@@ -922,6 +922,9 @@ femSmallStrain::~femSmallStrain()
     delete[] forceNodes_;
     delete[] fext_OF_;
     delete[] gravlo_;
+    delete[] ptDtemp_;
+    delete[] ptUtemp_;
+    delete[] ptAtemp_;
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
