@@ -216,7 +216,21 @@
   neq  =  MAXVAL(g_g_pp)
   neq  =  max_p(neq)
   CALL calc_neq_pp
-  CALL calc_npes_pp(npes,npes_pp)
+  !CALL calc_npes_pp(npes,npes_pp)
+  ! Set npes_pp
+  SELECT CASE (npes)
+      CASE (1:15)
+        npes_pp = npes
+      CASE (16:32)
+        npes_pp = npes
+      CASE (33:256)
+        npes_pp = npes/2
+      CASE (257:1024)
+        npes_pp = npes/4
+      CASE DEFAULT
+        npes_pp = npes/8
+  END SELECT
+ 
   CALL make_ggl(npes_pp,npes,g_g_pp)
   
   timest(4)=elap_time()	
