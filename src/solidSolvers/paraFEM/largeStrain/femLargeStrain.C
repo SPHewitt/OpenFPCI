@@ -414,7 +414,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     // Set nels_pp
     setnelspp_(&nels_pp_OF);
 
-    Pout << "nels_pp: " << nels_pp_OF << endl;
+    //Pout << "nels_pp: " << nels_pp_OF << endl;
 
     g_num_pp_OF_ = new int [nod*nels_pp_OF]; 
     ptDtemp_     = new double [ntot*nels_pp_OF];
