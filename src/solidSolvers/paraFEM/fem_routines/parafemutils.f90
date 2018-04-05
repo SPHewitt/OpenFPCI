@@ -789,7 +789,7 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE gloads(gravlo,specWeight,nn,nodof,nod,ndim,nr,g_coord,g_num_pp,rest)
+  SUBROUTINE gloads(gravlo_pp,specWeight,nn,nodof,nod,ndim,nr,g_coord,g_num_pp,rest)
 
   !/****f* parafemutils/gloads
   !*  NAME
@@ -815,15 +815,13 @@
   !*    rest     (nr,nodof+1)   - Matrix of restrained nodes
   !*
   !*  OUTPUT
-  !*    gravlo   (0:neq_pp)     - Vector of loads
+  !*    gravlo_pp   (neq_pp)     - Vector of loads
   !*		
   !*  WARNINGS
   !*    * Default direction is negative Y
-  !*    * REST must be rearranged before function call
-  !*    * Currently only works in serial	
+  !*    * REST must be rearranged before function call	
   !*
   !*  TODO
-  !*    * Write to work in Parallel
   !*    * Remove need for global coordinate matrix
   !*
   !*  AUTHOR
@@ -841,7 +839,7 @@
   
   IMPLICIT NONE
 
-  INTEGER                 :: i,j,k,iel,ndof,nodof,nn,nip,nf(nodof,nn)
+  INTEGER                 :: i,j,k,iel,ndof,nodof,nn,nip
   INTEGER                 :: node_end,node_start,nodes_pp
 
   INTEGER,INTENT(IN)      :: nr,nod,ndim,g_num_pp(nod,nels_pp)
@@ -851,69 +849,47 @@
 
   REAL(iwp)               :: lamba,det,g_coord_pp(nod,ndim,nels_pp)
   REAL(iwp)               :: g_coord(ndim,nn),pmul_pp(ntot,nels_pp)
-  REAL(iwp)               :: load_pp(ndim*nn),gravlotmp(0:neq_pp)
+  REAL(iwp)               :: load_pp(ndim*nn)
 
   REAL(iwp),INTENT(IN)    :: specWeight
 
-  REAL(iwp),INTENT(INOUT) :: gravlo(neq_pp)
+  REAL(iwp),INTENT(INOUT) :: gravlo_pp(neq_pp)
 
   CHARACTER(LEN=15)       :: element
 
-  INTEGER,ALLOCATABLE     :: num(:),g(:)
-
-  REAL(iwp),ALLOCATABLE   :: g_g(:,:),points(:,:),weights(:),eld(:)
+  REAL(iwp),ALLOCATABLE   :: points(:,:),weights(:)
   REAL(iwp),ALLOCATABLE   :: fun(:),der(:,:),jac(:,:)
 
   !----------  Apply loading to integration Points ---------
-  element="hexahedron" ; ndof = nodof*nod; nip = 8; nf = zero;
+  element="hexahedron" ; ndof = nodof*nod; nip = 8
 
-  IF(numpe.NE.1)THEN
-      PRINT*,"--------WARNING--------"
-      PRINT*," GLOADS is Serial Only "
-  ELSE
-      PRINT*,"Calculating gravity loads:"
-      PRINT*,"Element :",element
-      PRINT*,"Number of Integration points:",nip	
-  ENDIF
+  IF(numpe==1)PRINT*,"Calculating gravity loads:"
   
-  CALL REST_TO_NF(rest,nf)
-
   CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
 
-  ALLOCATE(num(nod),g(ntot),g_g(ntot,nels_pp),points(nip,ndim))
-  ALLOCATE(weights(nip),fun(nod),eld(ntot))
+  ALLOCATE(points(nip,ndim))
+  ALLOCATE(weights(nip),fun(nod))
   ALLOCATE(der(ndim,nod),jac(ndim,ndim))
+  
+  pmul_pp=zero
 
-  DO iel=1,nels_pp
-    num=g_num_pp(:,iel)
-    CALL num_to_g(num,nf,g)
-    g_g(:,iel)=g
-  END DO
-
-  CALL sample(element,points,weights); gravlotmp=zero; 
- 
-  elements_2: DO iel=1,nels_pp  
-    g=g_g(:,iel)
-    eld=zero;
+  CALL sample(element,points,weights)
+  
+  elements_1: DO iel=1,nels_pp  
     gauss_points_1: DO i=1,nip     
       CALL shape_der(der,points,i)
-
       jac=MATMUL(der,g_coord_pp(:,:,iel))
       det=determinant(jac)
-
       CALL shape_fun(fun,points,i)
-      eld(2:ndof-1:3)=eld(2:ndof-1:3)+fun(:)*det*weights(i)
+      pmul_pp(2:ndof-1:3,iel)=pmul_pp(2:ndof-1:3,iel)+fun(:)*det*weights(i)
+    END DO gauss_points_1
 
-    END DO gauss_points_1  
+    ! Sign included here to donate negative Y
+    pmul_pp(:,iel)=-pmul_pp(:,iel)*specWeight
+  END DO elements_1
 
-    gravlotmp(g)=gravlotmp(g)-eld*specWeight
-
-  END DO elements_2
-
-  ! gravlo decalred from 0:neq_pp - loop to correct it
-  DO i=1,neq_pp
-     gravlo(i)=gravlotmp(i)
-  ENDDO
+  gravlo_pp = zero 
+  CALL scatter(gravlo_pp,pmul_pp)
 
   ! Write the loads out to file
   !IF(.false.)

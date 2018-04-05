@@ -132,7 +132,25 @@
   neq  =  MAXVAL(g_g_pp)
   neq  =  max_p(neq)
   CALL calc_neq_pp
-  CALL calc_npes_pp(npes,npes_pp)
+  ! - Most failures occur in this routine
+  !CALL calc_npes_pp(npes,npes_pp)
+
+  ! Set npes_pp
+  SELECT CASE (npes)
+      CASE (1:15)
+        npes_pp = npes
+      CASE (16:32)
+        npes_pp = npes
+      CASE (33:256)
+        npes_pp = npes/2
+      CASE (257:1024)
+        npes_pp = npes/4
+      CASE DEFAULT
+        npes_pp = npes/8
+
+    END SELECT
+
+
   CALL make_ggl(npes_pp,npes,g_g_pp)
 
   CALL CALC_NN_PP(g_num_pp,nn_pp,nn_start)
@@ -189,7 +207,7 @@
   !--------------------------------------------------------------------
 
   SUBROUTINE runnl(node,val,num_var,mat_prop,nr,loaded_nodes,timeStep,nn_pp,nn_start, 	&
-                      g_g_pp,g_num_pp,g_coord_pp,gravlo,Dfield,Ufield,Afield)
+                      g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield)
   
   USE mpi_wrapper;     USE precision;    USE global_variables; 
   USE mp_interface;    USE input;        USE output; 
@@ -224,7 +242,7 @@
 
   REAL(iwp),INTENT(IN)      :: num_var(4),mat_prop(3),timeStep,g_coord_pp(nod,ndim,nels_pp)
 
-  REAL(iwp),INTENT(INOUT)   :: gravlo(neq_pp)
+  REAL(iwp),INTENT(INOUT)   :: gravlo_pp(neq_pp)
   REAL(iwp),INTENT(INOUT)   :: Dfield(ntot,nels_pp),Ufield(ntot,nels_pp)
   REAL(iwp),INTENT(INOUT)   :: Afield(ntot,nels_pp), val(ndim,loaded_nodes)
 
@@ -425,8 +443,8 @@
 
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   
-  fext_pp(1:) = fext_pp(1:) + gravlo
- 
+  fext_pp(1:) = fext_pp(1:) + gravlo_pp
+
   fextpiece_pp(1:) = fext_pp(1:)/FLOAT(num_load_steps)
   
 !------------------------------------------------------------------------------
@@ -713,7 +731,7 @@
         END IF 
       END IF 
 
-      IF(converged .OR. inewton==20) THEN
+      IF(converged .OR. inewton==10) THEN
         EXIT
       END IF
 
