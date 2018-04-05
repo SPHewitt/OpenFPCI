@@ -939,6 +939,9 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 
 femLargeStrain::~femLargeStrain()
 {
+    delete[] store_km_pp_OF_;
+    delete[] store_mm_pp_OF_;
+    delete[] diag_precon_pp_OF_;
     delete[] solidProps_;
     delete[] g_num_pp_OF_;
     delete[] g_g_pp_OF_;
