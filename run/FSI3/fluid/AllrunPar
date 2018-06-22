@@ -27,7 +27,6 @@ runApplication -l log.decomposePar.solid decomposePar -case ../solid -cellDist
 
 # Fluid Domain
 runApplication blockMesh
-#runApplication refineMesh -overwrite
 runApplication setSet -batch setBatch
 runApplication setsToZones -noFlipMap
 
@@ -41,9 +40,7 @@ cd ..
 
 cd fluid
 
-
 # Run test Case
-
 runParallel $application $NSLOTS &
 
 # ----------------------------------------------------------------- end-of-file

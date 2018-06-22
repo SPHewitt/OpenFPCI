@@ -12,6 +12,9 @@ cleanCase
 \rm -rf ../solid/VTK
 \rm -f *.ps
 \rm -f *.pdf
+\rm -f Case.*
+\rm -f fort.90
+\rm -f *.vtk
 
 cd ..
 ./removeSerialLinks fluid
