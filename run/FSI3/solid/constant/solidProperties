@@ -14,9 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidSolver DyParaFEMSolid;
+solidSolver femLargeStrain;
 
-DyParaFEMSolidCoeffs
+femLargeStrainCoeffs
 {
 
     nonLinear off;   // Not required for ParaFEM
@@ -25,13 +25,10 @@ DyParaFEMSolidCoeffs
 
     gravity 0.0;
 
-    alpha1 0;
-    beta1 0;
-    theta 1.0;
+    beta 0.25;
+    delta 0.5;
 
     rbfUpdate false;
-
-    timeStep 0.001;
 }
 
 
