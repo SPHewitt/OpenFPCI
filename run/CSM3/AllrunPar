@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Get application name
+application=`getApplication`
+
+# Mesh the Solid Domain
+runApplication blockMesh
+
+# Decompose the case
+runApplication decomposePar
+ 
+# Run solidFoam
+runParallel solidFoam 2 &
+
+# ----------------------------------------------------------------- end-of-file
