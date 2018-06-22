@@ -10,4 +10,10 @@ cleanCase
 \rm -f system/rest.txt
 
 # remove fort.90 
-\rm -f fort.90
+\rm -f fort.90 
+
+# Remove case.run
+\rm -f Case.run
+
+# Remove history
+\rm -rf history

@@ -14,11 +14,18 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// femLargeStrain 
 // Newmarks - Beta Method
+// Variables - beta and Delta
 
-solidSolver femNl;
+// femSmallStrain
+// Linear Interpolation
+// Variables - Theta
+// Damping Constants - alpha1 and beta1
 
-femNlCoeffs
+solidSolver femLargeStrain;
+
+femLargeStrainCoeffs
 {
     nonLinear off;   // Not required for ParaFEM
 
