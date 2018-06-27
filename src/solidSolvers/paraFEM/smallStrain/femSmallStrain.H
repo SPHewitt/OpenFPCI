@@ -107,7 +107,10 @@ class femSmallStrain
         int* g_num_pp_OF_;
 
         //- Equation Steering matrix
-        int*  g_g_pp_OF_; 
+        int*  g_g_pp_OF_;
+
+        //- Coordinate matrix per processor
+        double* g_coord_pp_OF_;
 
         //-
         int jj_;
@@ -121,8 +124,8 @@ class femSmallStrain
         //- Diagonal Preconditioner
         double*  diag_precon_pp_OF_;
 
-	    //- Gravity Loads
- 	    double* gravlo_;
+        //- Gravity Loads
+        double* gravlo_;
 
         //- Number of restrained nodes
         int numRestrNodes_;

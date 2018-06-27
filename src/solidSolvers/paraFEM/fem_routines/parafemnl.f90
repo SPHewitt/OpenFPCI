@@ -32,7 +32,7 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE initnl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,nn_pp,nn_start)
+  SUBROUTINE initnl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
 
   USE mpi_wrapper;    USE precision;  USE global_variables; 
   USE mp_interface;   USE input;      USE output; 
@@ -53,12 +53,13 @@
   INTEGER,INTENT(IN) 	    :: nn,nr
 
   INTEGER,INTENT(INOUT)     :: g_g_pp(ndim*nod,nels_pp),rest(nr,nodof+1)
-  INTEGER,INTENT(INOUT)     :: g_num_pp(nod,nels_pp),nn_pp,nn_start
+  INTEGER,INTENT(INOUT)     :: g_num_pp(nod,nels_pp)
 
   INTEGER                   :: iel,nip,npes_pp,partitioner,ndof
   INTEGER                   :: nlen,i
 
   REAL(iwp),INTENT(IN)      :: g_coord(ndim,nn)
+  REAL(iwp),INTENT(INOUT)   :: g_coord_pp(nod,ndim,nels_pp)
 
   CHARACTER(LEN=50)         :: argv
   CHARACTER(LEN=15)         :: element
@@ -100,9 +101,6 @@
 !----------------------------------------------------------------------
 ! 3. Populate g_num_pp
 !----------------------------------------------------------------------
-  
-  ! Poulate the Steering matrix
-  !CALL POPULATE_G_NUM_PP(g_num,g_num_pp,npes,nod,nels)
 
   ! Convert from Foam-Extend to Smith Gritths format
   DO iel=1,nels_pp
@@ -124,17 +122,16 @@
   ! Find the global Steering Matrix
   elements_0: DO iel=1,nels_pp
    CALL find_g(g_num_pp(:,iel),g_g_pp(:,iel),rest) ! Stable but slow
-  !  CALL find_g3(g_num_pp(:,iel),g_g_pp(:,iel),rest)! Unstable but Fast
+   !CALL find_g3(g_num_pp(:,iel),g_g_pp(:,iel),rest)! Unstable but Fast
   END DO elements_0
 
-  
   ! Build GGL Array
   neq  =  MAXVAL(g_g_pp)
   neq  =  max_p(neq)
   CALL calc_neq_pp
-  ! - Most failures occur in this routine
-  !CALL calc_npes_pp(npes,npes_pp)
 
+  ! Most failures occur in this routine
+  ! CALL calc_npes_pp(npes,npes_pp)
   ! Set npes_pp
   SELECT CASE (npes)
       CASE (1:15)
@@ -147,15 +144,17 @@
         npes_pp = npes/4
       CASE DEFAULT
         npes_pp = npes/8
-
-    END SELECT
-
+  END SELECT
 
   CALL make_ggl(npes_pp,npes,g_g_pp)
 
-  CALL CALC_NN_PP(g_num_pp,nn_pp,nn_start)
+!----------------------------------------------------------------------
+! 5. Populate g_coord_pp
+!----------------------------------------------------------------------
 
-  ! output g_g_pp,g_num_pp
+  CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim) 
+
+  ! output g_g_pp,g_num_pp,g_coord_pp
  
   END SUBROUTINE
 
@@ -163,50 +162,7 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE pop_gcoordpp(nn_pp,nn_start,g_coord,g_coord_pp,g_num_pp,nn)
-
-  USE mpi_wrapper;    USE precision;  USE global_variables; 
-  USE mp_interface;   USE input;      USE output; 
-  USE loading;        USE timing;     USE maths; 
-  USE gather_scatter; USE steering;   USE new_library;
-  USE large_strain;
-
-  IMPLICIT NONE
-
-  INTEGER,PARAMETER         :: ndim=3, nod=8
-
-
-  INTEGER,INTENT(IN) 	    :: nn
-  INTEGER,INTENT(INOUT)     :: g_num_pp(nod,nels_pp),nn_pp,nn_start
-
-  REAL(iwp),INTENT(INOUT)   :: g_coord_pp(nod,ndim,nels_pp)
-  REAL(iwp),INTENT(IN)      :: g_coord(ndim,nn)
-
-  INTEGER                   :: i, k, inpe
-
-   ! Routine hacked from READ_NODES in input.f90
-  
-    bufsize = ndim*nn
-
-    !CALL MPI_BCAST(g_coord,bufsize,MPI_REAL8,0,MPI_COMM_WORLD,ier)
-
-    nn_pp = UBOUND(g_coord_pp,2) 
-    inpe  = nn_start 
-
-    !DO i = 1,nn_pp
-    !  g_coord_pp(:,i) = g_coord(:,inpe)
-    !  inpe = inpe + 1
-    !END DO
-
-  CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim) 
-
-  END SUBROUTINE
-
-  !--------------------------------------------------------------------
-  !--------------------------------------------------------------------
-  !--------------------------------------------------------------------
-
-  SUBROUTINE runnl(node,val,num_var,mat_prop,nr,loaded_nodes,timeStep,nn_pp,nn_start, 	&
+  SUBROUTINE runnl(node,val,num_var,mat_prop,nr,loaded_nodes,timeStep, 	&
                       g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield)
   
   USE mpi_wrapper;     USE precision;    USE global_variables; 
@@ -231,9 +187,9 @@
 
 
   INTEGER                   :: printres
-  INTEGER                   :: nels,nn,nip, nn_pp,nlen
+  INTEGER                   :: nels,nn,nip,nlen
   INTEGER                   :: nf_start, fmt=1, i, j, k, m
-  INTEGER                   :: iters, limit, iel, nn_start
+  INTEGER                   :: iters, limit, iel
   INTEGER                   :: num_load_steps, iload, igauss
   INTEGER                   :: dimH, inewton, jump, npes_pp
   INTEGER                   :: partitioner=1
@@ -616,13 +572,21 @@
 ! 9. Newmark Scheme
 !-------------------------------------------------------------------------
 
+
+    
     ! New mark parameters
+    ! Damping excluded
+    ! Finite element procedures in engineering analysis, K‐J. Bathe, Prentice‐Hall, 1982, doi:10.1002/nag.1610070412
+    ! Pages 511-513
+
      a0  = 1.0/(alpha*(dtim**2.0))
-     a1  = zero
+     a1  = zero  ! delta/(alpha*dtim)
      a2  = 1.0/(alpha*dtim)
      a3  = (1.0/( 2.0*alpha)) -1.0
-     a4  = zero
-     a5  = zero
+     a4  = zero ! (delta/alpha) - 1.0
+     a5  = zero ! (delta/2)*((delta/alpha)-2.0)
+
+    ! Diverges from book due to exclusion of damping
      a6  = 1.0/(alpha*(dtim**2.0))
      a7  = -1.0/(alpha*dtim)
      a8  = -( (1.0/(2.0*alpha) ) -1.0)

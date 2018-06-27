@@ -86,12 +86,6 @@ class femLargeStrain
         //- Coordinate matrix per processor
          double* g_coord_pp_OF_;
 
-        //- nn_pp for g_coord_pp
-	int nn_pp_OF_;
-
-        //- nn_pp for g_coord_pp
-	int nn_start_OF_;
-
         //-
         int jj_;
 

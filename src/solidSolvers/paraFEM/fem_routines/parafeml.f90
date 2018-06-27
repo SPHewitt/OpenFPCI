@@ -38,7 +38,7 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE initl(g_coord,g_num_pp,rest,nn,nels,nr,sProp,g_g_pp,store_km_pp,store_mm_pp)
+  SUBROUTINE initl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
 
   !/****f* parafeml/initl
   !*  NAME
@@ -83,6 +83,7 @@
   USE mp_interface;   USE input;      USE output; 
   USE loading;        USE timing;     USE maths; 
   USE gather_scatter; USE steering;   USE new_library;
+  USE large_strain;
 
   IMPLICIT NONE
 
@@ -90,59 +91,35 @@
 ! 1. Declare variables
 !----------------------------------------------------------------------
 
-  INTEGER,PARAMETER		    :: nodof=3,ndim=3,nst=6,nod=8
-  REAL(iwp),PARAMETER		  :: zero=0.0_iwp
+  INTEGER,PARAMETER        :: nodof=3,ndim=3,nst=6,nod=8
+  REAL(iwp),PARAMETER      :: zero=0.0_iwp
 
-  INTEGER,INTENT(IN) 		  :: nels,nn
+  INTEGER,INTENT(IN)       :: nn,nr
 
-  INTEGER,INTENT(INOUT)		:: g_g_pp(ndim*nod,nels_pp),rest(nr,nodof+1)
-  INTEGER,INTENT(INOUT)		:: g_num_pp(nod,nels_pp)
+  INTEGER,INTENT(INOUT)    :: g_g_pp(ndim*nod,nels_pp),rest(nr,nodof+1)
+  INTEGER,INTENT(INOUT)    :: g_num_pp(nod,nels_pp)
 
-  INTEGER                 :: iel,i,j,k,l,m,n,nr,nip,ndof,npes_pp,nlen
-  INTEGER			            :: partitioner,printres,RSS,VM,RSSa,VMa
+  INTEGER                   :: iel,nip,npes_pp,partitioner,ndof
+  INTEGER                   :: nlen,i
 
-  REAL(iwp),INTENT(INOUT)	:: g_coord(ndim,nn),sProp(3)
-  REAL(iwp),INTENT(INOUT)	:: store_km_pp(ndim*nod,ndim*nod,nels_pp)
-  REAL(iwp),INTENT(INOUT)	:: store_mm_pp(ndim*nod,ndim*nod,nels_pp)
+  REAL(iwp),INTENT(INOUT)  :: g_coord(ndim,nn)
+  REAL(iwp),INTENT(INOUT)  :: g_coord_pp(nod,ndim,nels_pp)
 
-  REAL(iwp)			          :: det,period,volume,tol,e,v,rho	
-
-  LOGICAL			            :: converged=.false.
-  LOGICAL			            :: consistent=.TRUE.
-  LOGICAL			            :: initialised	
-
-  CHARACTER(LEN=50)		    :: argv
-  CHARACTER(LEN=15)		    :: element
-  CHARACTER(LEN=6) 		    :: ch
-  CHARACTER(LEN=1024) 		:: filename  
-
-!----------------------------------------------------------------------
-! 2. Declare dynamic arrays
-!----------------------------------------------------------------------
-
-  REAL(iwp),ALLOCATABLE		:: points(:,:),dee(:,:),weights(:),timest(:)
-  REAL(iwp),ALLOCATABLE		:: jac(:,:),der(:,:),deriv(:,:),bee(:,:)
-  REAL(iwp),ALLOCATABLE		:: fun(:),emm(:,:),ecm(:,:),g_coord_pp(:,:,:)
-
-  INTEGER,ALLOCATABLE		  :: node(:),localcount(:),readcount(:)
+  CHARACTER(LEN=50)        :: argv
+  CHARACTER(LEN=15)        :: element
  
-  ! Initilal System Memory Usage
-  CALL system_mem_usage(RSSa,VMa)
- 
+  LOGICAL                  :: initialised
+
 !----------------------------------------------------------------------
-! 3. Input and Initialisation
+! 2. Input and Initialisation
 !---------------------------------------------------------------------- 
+
+  ! Degrees of Freedon per Element
+  ndof  =  nod*nodof
+  ntot  =  ndof
 
   ! Variables required for writing and partioning
   argv="Case"; nlen=4; nip=8; element="hexahedron"; partitioner=1
-
-
-  ! Youndgs Modulus, Poissons Ratio and Density
-  e=sProp(1);v=sProp(2);rho=sProp(3);
-
-  ALLOCATE(timest(20))
-  timest	  =  zero
-  timest(1)	=  elap_time()
 
   ! Test for MPI Initialisation
   CALL MPI_INITIALIZED(initialised,ier) 
@@ -165,58 +142,39 @@
   ! Calculate iel_start
   CALL setielstart() 
 
-  ! Degrees of Freedon per Element
-  ndof  =  nod*nodof
-  ntot  =  ndof
- 
 !----------------------------------------------------------------------
-! 4. Populate g_coord_pp and g_num_pp
+! 3. Populate  g_num_pp
 !----------------------------------------------------------------------
-  timest(2)=elap_time();
   
-  ALLOCATE(g_coord_pp(nod,ndim,nels_pp))
-  g_coord_pp  =  zero
-  
-  ! Poulate the Steering matrix
-  !CALL POPULATE_G_NUM_PP(g_num,g_num_pp,npes,nod,nels)
-
   ! Convert from Foam-Extend to Smith Gritths format
   DO iel=1,nels_pp
     CALL of2sg(element,g_num_pp(:,iel),nod)
   ENDDO
-
-  ! Populate Coorinate Matrix
-  !CALL POPULATE_G_COORD_PP(g_coord,g_coord_pp,g_num_pp,npes,nn,nod,ndim)
-  CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim) 
- 
-  timest(3)=elap_time();
   
 !----------------------------------------------------------------------
-! 5. Find the Steering arrays and equations per core
+! 4. Calculate g_g_pp
 !----------------------------------------------------------------------
-
-  ALLOCATE(points(nip,ndim),dee(nst,nst),jac(ndim,ndim))
-  ALLOCATE(der(ndim,nod),deriv(ndim,nod),bee(nst,ntot))
-  ALLOCATE(weights(nip),ecm(ntot,ntot),emm(ntot,ntot),fun(nod))
 
   ! Rearrange the rest Array
   CALL rearrange(rest)
 
   ! Clean arrays
   g_g_pp  =  zero
-  neq	    =  zero
+  neq     =  zero
   
   ! Find the global Steering Matrix
   elements_0: DO iel=1,nels_pp
-  ! CALL find_g(g_num_pp(:,iel),g_g_pp(:,iel),rest) ! Stable but slow
-    CALL find_g3(g_num_pp(:,iel),g_g_pp(:,iel),rest)! Unstable but Fast
+    !CALL find_g(g_num_pp(:,iel),g_g_pp(:,iel),rest) ! Stable but slow
+    CALL find_g3(g_num_pp(:,iel),g_g_pp(:,iel),rest) ! Unstable but Fast
   END DO elements_0
   
   ! Build GGL Array
   neq  =  MAXVAL(g_g_pp)
   neq  =  max_p(neq)
   CALL calc_neq_pp
-  !CALL calc_npes_pp(npes,npes_pp)
+
+  ! Most failures occur in this routine
+  ! CALL calc_npes_pp(npes,npes_pp)
   ! Set npes_pp
   SELECT CASE (npes)
       CASE (1:15)
@@ -232,13 +190,117 @@
   END SELECT
  
   CALL make_ggl(npes_pp,npes,g_g_pp)
+
+!----------------------------------------------------------------------
+! 5. Populate g_coord_pp
+!----------------------------------------------------------------------
+
+  CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim) 
+ 
+  ! output g_g_pp,g_num_pp,g_coord_pp
+
+  END SUBROUTINE
+
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+
+  SUBROUTINE finddiagl(store_km_pp,store_mm_pp,g_coord_pp,numVar,sProp,diag_precon_pp)
+  !/****f* parafeml/finddiagl
+  !*  NAME
+  !*    SUBROUTINE: finddiagl
+  !*
+  !*  SYNOPSIS
+  !*    Usage: finddiagl_(store_km_pp_OF_,store_mm_pp_OF_,      &
+  !*                            numSchemes_,diag_precon_pp_OF_); 
+  !*
+  !*  FUNCTION
+  !*    Calculates the diagonal preconditioner vector used 
+  !*    in the PCG solution.
+  !*
+  !*  INPUTS
+  !*    store_km_pp (ntot,ntot,nels_pp)  - Stiffness Matrix	
+  !*    store_mm_pp (ntot,ntot,nels_pp)  - Mass Matrix
+  !*
+  !*    numVar      (a1 b1 theta dTim)   - Numerical Variables			
+  !*	 			
+  !*  OUTPUT
+  !*   	diag_precon_pp (neq_pp)          - Diagonal Preconditioner
+  !*			
+  !*  AUTHOR
+  !*    S. Hewitt
+  !******
+  !*/
   
-  timest(4)=elap_time()	
+  USE mpi_wrapper;	USE precision;	USE global_variables; 
+  USE mp_interface; 	USE input;	USE output; 
+  USE loading; 		USE timing; 	USE maths; 
+  USE gather_scatter;	USE steering; 	USE new_library; 
+  
+  IMPLICIT NONE
+  
+!------------------------------------------------------------------------------ 
+! 1. Declare variables
+!------------------------------------------------------------------------------
+
+  INTEGER,PARAMETER         :: nodof=3,ndim=3,nst=6,nod=8
+  REAL(iwp),PARAMETER       :: zero=0.0_iwp
+  
+  INTEGER                   :: i,j,k,iel,ndof,nip
+
+  REAL(iwp),INTENT(INOUT)   :: store_km_pp(ndim*nod,ndim*nod,nels_pp)
+  REAL(iwp),INTENT(INOUT)   :: store_mm_pp(ndim*nod,ndim*nod,nels_pp)
+  REAL(iwp),INTENT(INOUT)   :: g_coord_pp(nod,ndim,nels_pp)
+  REAL(iwp),INTENT(IN)      :: numVar(4),sProp(3)
+  
+  REAL(iwp),INTENT(INOUT)   :: diag_precon_pp(neq_pp)
+  
+  REAL(iwp)                 :: alpha1,beta1,theta
+  REAL(iwp)                 :: dtim,c3,c4
+  REAL(iwp)                 :: det,e,rho,v,volume
+
+  CHARACTER(LEN=15)         :: element
+
+  LOGICAL                   :: consistent=.TRUE.
+  
+
+
+!----------------------------------------------------------------------
+! 2. Declare dynamic arrays
+!----------------------------------------------------------------------
+
+  REAL(iwp),ALLOCATABLE :: diag_precon_tmp(:,:)
+  REAL(iwp),ALLOCATABLE :: points(:,:),dee(:,:),weights(:)
+  REAL(iwp),ALLOCATABLE :: jac(:,:),der(:,:),deriv(:,:),bee(:,:)
+  REAL(iwp),ALLOCATABLE :: fun(:),emm(:,:),ecm(:,:)
+
+  INTEGER,ALLOCATABLE   :: node(:),localcount(:),readcount(:)
+  
+  ! Set Parameters
+  alpha1  =  numVar(1)
+  beta1   =  numVar(2)
+  theta   =  numVar(3)
+  dtim	  =  numVar(4)
+  c3      =  alpha1+1._iwp/(theta*dtim)
+  c4      =  beta1+theta*dtim
+  ndof    =  ntot
 
 !----------------------------------------------------------------------
 ! 6. Element Stiffness and Mass Integration
 !----------------------------------------------------------------------
-  
+
+  ! Variables required for writing and partioning
+  nip=8; element="hexahedron"
+
+  ALLOCATE(points(nip,ndim),dee(nst,nst),jac(ndim,ndim))
+  ALLOCATE(der(ndim,nod),deriv(ndim,nod),bee(nst,ntot))
+  ALLOCATE(weights(nip),ecm(ntot,ntot),emm(ntot,ntot),fun(nod))
+
+
+
+  ! Youngs Modulus, Poissons Ratio and Density
+  e=sProp(1);v=sProp(2);rho=sProp(3);
+
   ! [D] : Stress-Strain Matrix
   dee  =  zero 
   CALL deemat(dee,e,v)
@@ -248,7 +310,7 @@
   store_km_pp  =  zero
   store_mm_pp  =  zero
   
-  elements_2: DO iel=1,nels_pp
+  elements_1: DO iel=1,nels_pp
     volume  	=  zero
     emm  	=  zero
     ecm  	=  zero
@@ -291,107 +353,10 @@
       DO i=39,57,6; emm(i,i)=emm(4,4)*.125_iwp; END DO
     END IF
     store_mm_pp(:,:,iel)  =  emm
-  END DO elements_2  
-  
-  timest(5)=elap_time()	
-  
-!----------------------------------------------------------------------
-! 6. Print Information about Runtime to File
-!---------------------------------------------------------------------- 
-
-  ! Manual Switch to turn on/off .res file
-  printres  =  1
-  
-  IF(numpe==1 .AND. printres==1)THEN
-  CALL system_mem_usage(RSS,VM)
-  OPEN(11,FILE=argv(1:nlen)//".res",STATUS='REPLACE',ACTION='WRITE')
-    WRITE(11,'(A,I7,A)') "This job ran on ",npes," processes"
-    WRITE(11,'(A,3(I12,A))') "There are ",nn," nodes", nr, &
-                            " restrained and ",neq," equations"
-    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
-    WRITE(11,'(A,F10.4)') "Time to Populate g_coord/num_pp is:",timest(3)-timest(2)
-    WRITE(11,'(A,F10.4)') "Time to find_g & make_ggl:",timest(4)-timest(3)
-    WRITE(11,'(A,F10.4)') "Time to Build K and M:",timest(5)-timest(4)
-    WRITE(11,'(A,F10.4)') "Time in Routine(Total):",elap_time()-timest(1)
-    WRITE(11,'(A,F10.4)') "-------------------------------------------------"
-    WRITE(11,'(A,I10)') "Virtual Memory Change(Kb): ",VM-VMa
-    WRITE(11,'(A,I10)') "RSS Memory Change(Kb): ",RSS-RSSa
-    WRITE(11,'(A,I10)') "Total Virtual Memory(Kb): ",VM
-    WRITE(11,'(A,I10)') "Total RSS Memory (Kb): ",RSS
-  CLOSE(11)
-  END IF
-  
+  END DO elements_1  
+    
   DEALLOCATE(points,dee,jac,der,deriv,bee)
-  DEALLOCATE(weights,ecm,emm,fun,g_coord_pp,timest)
- 
-  END SUBROUTINE
-
-  !--------------------------------------------------------------------
-  !--------------------------------------------------------------------
-  !--------------------------------------------------------------------
-
-  SUBROUTINE finddiagl(store_km_pp,store_mm_pp,numVar,diag_precon_pp)
-  !/****f* parafeml/finddiagl
-  !*  NAME
-  !*    SUBROUTINE: finddiagl
-  !*
-  !*  SYNOPSIS
-  !*    Usage: finddiagl_(store_km_pp_OF_,store_mm_pp_OF_,      &
-  !*                            numSchemes_,diag_precon_pp_OF_); 
-  !*
-  !*  FUNCTION
-  !*    Calculates the diagonal preconditioner vector used 
-  !*    in the PCG solution.
-  !*
-  !*  INPUTS
-  !*    store_km_pp (ntot,ntot,nels_pp)  - Stiffness Matrix	
-  !*    store_mm_pp (ntot,ntot,nels_pp)  - Mass Matrix
-  !*
-  !*    numVar      (a1 b1 theta dTim)   - Numerical Variables			
-  !*	 			
-  !*  OUTPUT
-  !*   	diag_precon_pp (neq_pp)          - Diagonal Preconditioner
-  !*			
-  !*  AUTHOR
-  !*    S. Hewitt
-  !******
-  !*/
-  
-  USE mpi_wrapper;	  USE precision;	USE global_variables; 
-  USE mp_interface; 	USE input;	    USE output; 
-  USE loading; 		    USE timing; 	  USE maths; 
-  USE gather_scatter;	USE steering; 	USE new_library; 
-  
-  IMPLICIT NONE
-  
-!------------------------------------------------------------------------------ 
-! 1. Declare variables used in the main program
-!------------------------------------------------------------------------------
-
-  INTEGER,PARAMETER		    :: nodof=3,ndim=3,nst=6, nod=8
-  REAL(iwp),PARAMETER		  :: zero=0.0_iwp
-  
-  INTEGER			            :: i,j,k,iel,ndof
-
-  REAL(iwp),INTENT(IN)		:: store_km_pp(ndim*nod,ndim*nod,nels_pp)
-  REAL(iwp),INTENT(IN)		:: store_mm_pp(ndim*nod,ndim*nod,nels_pp)
-  REAL(iwp),INTENT(IN)		:: numVar(4)
-  
-  REAL(iwp),INTENT(INOUT)	:: diag_precon_pp(neq_pp)
-  
-  REAL(iwp)			          :: alpha1,beta1,theta
-  REAL(iwp)			          :: dtim,c3,c4
-  
-  REAL(iwp),ALLOCATABLE		:: timest(:),diag_precon_tmp(:,:)
-  
-  ! Set Parameters
-  alpha1  =  numVar(1)
-  beta1   =  numVar(2)
-  theta   =  numVar(3)
-  dtim	  =  numVar(4)
-  c3	    =  alpha1+1._iwp/(theta*dtim)
-  c4	    =  beta1+theta*dtim
-  ndof    =  ntot
+  DEALLOCATE(weights,ecm,emm,fun)
   
 !---------------------------------------------------------------------- 
 ! 2. Calculate Diagonal preconditioner
@@ -681,7 +646,7 @@
       
       CALL scatter(u_pp,utemp_pp)
       
-      up		=  DOT_PRODUCT_P(loads_pp,d_pp);
+      up        =  DOT_PRODUCT_P(loads_pp,d_pp);
       alpha	=  up/DOT_PRODUCT_P(p_pp,u_pp)
       xnew_pp	=  x_pp+p_pp*alpha; 
       loads_pp	=  loads_pp-u_pp*alpha

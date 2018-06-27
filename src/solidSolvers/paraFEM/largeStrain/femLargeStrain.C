@@ -64,18 +64,7 @@ extern"C"
         int* nr,
         int* g_num_pp,
         int* g_g_pp,
-	int* nn_pp,
-        int* nn_start
-    );
-
-    void pop_gcoordpp_
-    (
-	int* nn_pp,
-        int* nn_start,
-        double* g_coord,	
-        double* g_coord_pp,
-        int* g_num_pp,
-        int* nn
+        double* g_coord_pp
     );
 
     // return number of equations/proc 
@@ -119,8 +108,6 @@ extern"C"
         int* nr,
         int* loadedNodes,
 	double* time,
-        int* nn_pp,
-	int* nn_start,
         int* g_g_pp,
         int* g_num_pp,
         double* g_coord_pp,
@@ -180,8 +167,6 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     g_num_pp_OF_(NULL),
     g_g_pp_OF_(NULL),
     g_coord_pp_OF_(NULL),
-    nn_pp_OF_(0),
-    nn_start_OF_(0),
     gravlo_(NULL),
     numRestrNodes_(0),
     rest_(NULL),
@@ -750,21 +735,10 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         &numRestrNodes_,
         g_num_pp_OF_,
         g_g_pp_OF_,
-	&nn_pp_OF_,
-        &nn_start_OF_
+        g_coord_pp_OF_
     );
 
     reduce(tmp,sumOp<label>());
-
-    pop_gcoordpp_
-    (
-        &nn_pp_OF_,
-        &nn_start_OF_,
-        mPoints_,
-        g_coord_pp_OF_,
-        g_num_pp_OF_,
-        &gPoints_
-    );
 
     // Must follow initparafem
     const int neq_pp_OF = findneqpp_();
@@ -1849,8 +1823,6 @@ bool femLargeStrain::evolve()
         &numRestrNodes_,
         &numFixedForceNodes_,
 	&dtim,
-        &nn_pp_OF_,
-        &nn_start_OF_,
         g_g_pp_OF_,
         g_num_pp_OF_,
         g_coord_pp_OF_,

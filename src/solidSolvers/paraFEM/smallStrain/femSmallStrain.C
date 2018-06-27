@@ -59,15 +59,12 @@ extern"C"
     void initl_
     (
         double* g_coord,	
-        int* g_num_pp,
         int* rest,
         int* nn, 
-        const int* nels,
         const int* nr,
-	double* SolidProperties,
+        int* g_num_pp,
         int* g_g_pp,
-	double* stiff,
-	double* mass
+        double* g_coord_pp
     );
 
     // return number of equations/proc 
@@ -95,7 +92,9 @@ extern"C"
     (
         double* stiff,
 	double* mass,
+        double* g_coord_pp,
 	double* NumericalVariables,
+	double* SolidProperties,
         double* precon
     );
 
@@ -178,6 +177,7 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     numSchemes_(NULL),
     g_num_pp_OF_(NULL),
     g_g_pp_OF_(NULL),
+    g_coord_pp_OF_(NULL),
     store_km_pp_OF_(NULL),
     store_mm_pp_OF_(NULL),
     diag_precon_pp_OF_(NULL),
@@ -689,6 +689,8 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
 //------------------------------------------------------------------------------
 
     g_g_pp_OF_ 	    =  new int [ntot*nels_pp_OF];
+    g_coord_pp_OF_  =  new double [nod*ndim*nels_pp_OF];
+
     store_km_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
     store_mm_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
 
@@ -719,15 +721,12 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     initl_
     (
         mPoints_,
-        g_num_pp_OF_,
         rest_,
         &gPoints_,
-        &gCells_,
         &numRestrNodes_,
-        solidProps_,
+        g_num_pp_OF_,
         g_g_pp_OF_,
-        store_km_pp_OF_,
-	    store_mm_pp_OF_
+        g_coord_pp_OF_
     );
 
     reduce(tmp,sumOp<label>());
@@ -771,7 +770,7 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     	for(int i=0;i<neq_pp_OF;i++)
     	{
 	        gravlo_[i]=0.0;
- 	    }
+ 	}
     }
     
 
@@ -779,7 +778,7 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
 //  ParaFEM: Find Diagonal Preconditioner
 //------------------------------------------------------------------------------
 
-    finddiagl_(store_km_pp_OF_,store_mm_pp_OF_,numSchemes_,diag_precon_pp_OF_);
+    finddiagl_(store_km_pp_OF_,store_mm_pp_OF_,g_coord_pp_OF_,numSchemes_,solidProps_,diag_precon_pp_OF_);
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Force Arrays
