@@ -45,14 +45,13 @@
   !*    SUBROUTINE: initl
   !*
   !*  SYNOPSIS
-  !*    Usage: initl_(mPoints_,g_num_pp_OF_,rest_,&gPoints,
-  !*                   &gCells,&numRestrNodes_,solidProps_,
-  !*                   g_g_pp_OF_,store_km_pp_OF_,store_mm_pp_OF_);
+  !*    Usage:  initl_(mPoints_,rest_,&gPoints_,&numRestrNodes_,
+  !*                   g_num_pp_OF_,g_g_pp_OF_,g_coord_pp_OF_);
   !*            
   !*  FUNCTION
   !*    Initialises ParaFEM, this inculdes initialising the MPI
-  !*    calculating the stiffness matrix [k], Mass Matrix [M] 
-  !*	and steering matrix (g_g_pp).
+  !*    Passing mesh information from OpenFOAM into ParaFEM and  
+  !*	creating the steering matrix (g_g_pp).
   !*
   !*  INPUTS
   !*    g_coord   (ndim,nn)     - Coordinates of the mesh		
@@ -60,23 +59,19 @@
   !*    rest      (nr,nodof+1)  - Restrained Nodes, e.g.(# x y z)
   !*
   !*    nn                      - Number of Nodes
-  !*    nels                    - Number of elements
-  !*    nr                      - Number of restrained Nodes
-  !*
-  !*    solidProp (e v rho)     - Solid Properties 	 
+  !*    nr                      - Number of restrained Nodes	 
   !*	  			
   !*  OUTPUT
   !*    g_g_pp      (ntot,nels_pp)      - Global Steering Matrix
-  !*   	store_km_pp (ntot,ntot,nels_pp) - Stiffness Matrix [k]
-  !*   	store_mm_pp (ntot,ntot,nels_pp) - Mass Matrix [M]
+  !*    g_coord_pp  (nod,ndim,nels_pp)  - Coordinate steering 
 
   !*			
   !*  AUTHOR
   !*    S. Hewitt
   !******
   !*  COMMENTS
-  !*    nels is currently deprecated, however it is possibly used to
-  !*    decompose the mesh using calc_nels_pp.
+  !*  initl and initnl are the same and so one will be removed 
+  !*  prior to the next release  
   !*/
 
   USE mpi_wrapper;    USE precision;  USE global_variables; 
@@ -262,8 +257,6 @@
   CHARACTER(LEN=15)         :: element
 
   LOGICAL                   :: consistent=.TRUE.
-  
-
 
 !----------------------------------------------------------------------
 ! 2. Declare dynamic arrays

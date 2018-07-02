@@ -34,6 +34,40 @@
 
   SUBROUTINE initnl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
 
+  !/****f* parafeml/initnl
+  !*  NAME
+  !*    SUBROUTINE: initnl
+  !*
+  !*  SYNOPSIS
+  !*    Usage:  initnl_(mPoints_,rest_,&gPoints_,&numRestrNodes_,
+  !*                   g_num_pp_OF_,g_g_pp_OF_,g_coord_pp_OF_);
+  !*            
+  !*  FUNCTION
+  !*    Initialises ParaFEM, this inculdes initialising the MPI
+  !*    Passing mesh information from OpenFOAM into ParaFEM and  
+  !*	creating the steering matrix (g_g_pp).
+  !*
+  !*  INPUTS
+  !*    g_coord   (ndim,nn)     - Coordinates of the mesh		
+  !*    g_num_pp  (nod,nels_pp) - Steering matrix				
+  !*    rest      (nr,nodof+1)  - Restrained Nodes, e.g.(# x y z)
+  !*
+  !*    nn                      - Number of Nodes
+  !*    nr                      - Number of restrained Nodes	 
+  !*	  			
+  !*  OUTPUT
+  !*    g_g_pp      (ntot,nels_pp)      - Global Steering Matrix
+  !*    g_coord_pp  (nod,ndim,nels_pp)  - Coordinate steering 
+
+  !*			
+  !*  AUTHOR
+  !*    S. Hewitt
+  !******
+  !*  COMMENTS
+  !*  initl and initnl are the same and so one will be removed 
+  !*  prior to the next release  
+  !*/
+
   USE mpi_wrapper;    USE precision;  USE global_variables; 
   USE mp_interface;   USE input;      USE output; 
   USE loading;        USE timing;     USE maths; 
