@@ -43,9 +43,9 @@ using namespace rbf;
 
 // * * * * * * * * * * * * ParaFEM Fortran Subroutines* * * * * * * * * * * * //
 // - Will need editing when more complex elements introduced
-const int nod 	=  8;        // Element type
-const int ndim 	=  3;	     // Number of Dimensions
-const int ntot	=  ndim*nod; // ntot
+const int nod   =  8;        // Element type
+const int ndim  =  3;        // Number of Dimensions
+const int ntot  =  ndim*nod; // ntot
 
 using namespace std;
 
@@ -58,7 +58,7 @@ extern"C"
     // Called at construction
     void initl_
     (
-        double* g_coord,	
+        double* g_coord,
         int* rest,
         int* nn, 
         const int* nr,
@@ -71,86 +71,43 @@ extern"C"
     int findneqpp_();
 
     // return number of cells/proc
-    int findnelspp_();
-
-    // return number of cells/proc
     int setnelspp_
     (
-	const int* numCells
-//	int* numProcessors
-    );
-
-    // Calculate number of cells/proc
-    int calcnelsppof_
-    (
-	int* numElements,
-	int* numProcessors
-    );
-
-    // Find the Diagonal preconditioner
-    void finddiagl_
-    (
-        double* stiff,
-	double* mass,
-        double* g_coord_pp,
-	double* NumericalVariables,
-	double* SolidProperties,
-        double* precon
-    );
-
-    // Print out the Force to Ensignt Format
-    void checkforce_
-    (
-        double* force,
-        int* sense, 
-        int* node,
-        int* solidPatchIDSize,
-        int* solidMeshSize
+        const int* numCells
     );
 
     // Solve the structural equation
     void runl_
     (
-	double* NumericalVariables,
+        double* numVar,
+        double* sProp,
         double* f_ext, 
         int* f_node,
-        int* solidPatchIDSize,
-	double* time,
+        int* nr,
+        double* time,
         int* nn,
+        double* g_coord_pp,
         int* g_g_pp,
         int* g_num_pp,
-	double* stiff,
-	double* mass,
-        double* precon,
-	double* gravlo,
-	double* ptDtemp_,
-	double* ptUtemp_,
-	double* ptAtmep_
+        double* gravlo,
+        double* DField,
+        double* UField,
+        double* AField
     );
 
-	// Print ParaFem to file (ENSI GOLD)
-    void checkparafem_
-    (
-        double* mesh,
-        int* g_num,
-    	int* restraint,
-        int* nn,
-        int* nels
-    );
-
-	// Calculate Gravitational Loads 
+    // Calculate Gravitational Loads 
     void gloads_
     (
-	double* gravlo,
-	double* gravity,
-	int* nn,
-	int* nodof,
-	const int* nod,
-	const int* ndim,
-	int* nr,
-	double*	g_coord,
-	int* g_num_pp,
-	int* rest
+        double* gravlo,
+        double* gravity,
+        int* nn,
+        int* nodof,
+        const int* nod,
+        const int* ndim,
+        int* nr,
+        double* g_coord,
+        int* g_num_pp,
+        int* rest
     );
 }
 
@@ -178,9 +135,6 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     g_num_pp_OF_(NULL),
     g_g_pp_OF_(NULL),
     g_coord_pp_OF_(NULL),
-    store_km_pp_OF_(NULL),
-    store_mm_pp_OF_(NULL),
-    diag_precon_pp_OF_(NULL),
     gravlo_(NULL),
     numRestrNodes_(0),
     rest_(NULL),
@@ -411,8 +365,6 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     
     // Set nels_pp
     setnelspp_(&nels_pp_OF);
-
-    //Pout << "nels_pp: " << nels_pp_OF << endl;
 
     g_num_pp_OF_ = new int [nod*nels_pp_OF]; 
     ptDtemp_     = new double [ntot*nels_pp_OF];
@@ -691,12 +643,8 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     g_g_pp_OF_ 	    =  new int [ntot*nels_pp_OF];
     g_coord_pp_OF_  =  new double [nod*ndim*nels_pp_OF];
 
-    store_km_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
-    store_mm_pp_OF_ =  new double [ntot*ntot*nels_pp_OF];
-
     double alpha1 (readScalar(solidProperties().lookup("alpha1")));
     double beta1 (readScalar(solidProperties().lookup("beta1")));
-    //double timestep (readScalar(solidProperties().lookup("timeStep")));
     double timestep = mesh.time().deltaTValue();
     double theta (readScalar(solidProperties().lookup("theta")));
     
@@ -731,15 +679,11 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
 
     reduce(tmp,sumOp<label>());
 
-    // Must follow initparafem
-    const int neq_pp_OF = findneqpp_();
-    diag_precon_pp_OF_ = new double [neq_pp_OF];
-    
-
 //------------------------------------------------------------------------------
 //  ParaFEM: Find Gravitry loading if set in dictionary
 //------------------------------------------------------------------------------
 
+    const int neq_pp_OF = findneqpp_();
     double gravity(readScalar(solidProperties().lookup("gravity")));
     gravlo_ = new double [neq_pp_OF];
 
@@ -773,12 +717,6 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
  	}
     }
     
-
-//------------------------------------------------------------------------------
-//  ParaFEM: Find Diagonal Preconditioner
-//------------------------------------------------------------------------------
-
-    finddiagl_(store_km_pp_OF_,store_mm_pp_OF_,g_coord_pp_OF_,numSchemes_,solidProps_,diag_precon_pp_OF_);
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Force Arrays
@@ -911,9 +849,6 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
 
 femSmallStrain::~femSmallStrain()
 {
-    delete[] store_km_pp_OF_;
-    delete[] store_mm_pp_OF_;
-    delete[] diag_precon_pp_OF_;
     delete[] solidProps_;
     delete[] g_num_pp_OF_;
     delete[] g_g_pp_OF_;
@@ -1814,21 +1749,20 @@ bool femSmallStrain::evolve()
 //------------------------------------------------------------------------------
     runl_
     (
-	numSchemes_,
+        numSchemes_,
+        solidProps_,
         fext_OF_,
         forceNodes_,
         &numFixedForceNodes_,
-	&time,	
+        &time,
         &lPoints,
+        g_coord_pp_OF_,
         g_g_pp_OF_,
         g_num_pp_OF_,
-        store_km_pp_OF_,
-	store_mm_pp_OF_,
-        diag_precon_pp_OF_,
-	gravlo_,
-	ptDtemp_,
-	ptUtemp_,
-	ptAtemp_
+        gravlo_,
+        ptDtemp_,
+        ptUtemp_,
+        ptAtemp_
     );
 
 

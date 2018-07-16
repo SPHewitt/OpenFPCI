@@ -115,15 +115,6 @@ class femSmallStrain
         //-
         int jj_;
 
-        //- Stiffness Matrix per processor
-        double*  store_km_pp_OF_;
-
-        //- Mass Matrix per processor
-        double*  store_mm_pp_OF_;
-
-        //- Diagonal Preconditioner
-        double*  diag_precon_pp_OF_;
-
         //- Gravity Loads
         double* gravlo_;
 
