@@ -79,20 +79,20 @@ extern"C"
     // Solve the structural equation
     void runl_
     (
+        int* node,
+        double* val, 
         double* numVar,
-        double* sProp,
-        double* f_ext, 
-        int* f_node,
+        double* matProp,
         int* nr,
+        int* loadedNodes,
         double* time,
-        int* nn,
-        double* g_coord_pp,
         int* g_g_pp,
         int* g_num_pp,
+        double* g_coord_pp,
         double* gravlo,
-        double* DField,
-        double* UField,
-        double* AField
+        double* ptDtemp_,
+        double* ptUtemp_,
+        double* ptAtmep_
     );
 
     // Calculate Gravitational Loads 
@@ -1709,8 +1709,7 @@ bool femSmallStrain::evolve()
     Info << "Evolving solid solver: " 
         << femSmallStrain::typeName << endl;
     
-    label lPoints = mesh().points().size();
-    double time = mesh().time().value();
+    double dtim = runTime().deltaT().value();
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
@@ -1749,16 +1748,16 @@ bool femSmallStrain::evolve()
 //------------------------------------------------------------------------------
     runl_
     (
+        forceNodes_,
+        fext_OF_,
         numSchemes_,
         solidProps_,
-        fext_OF_,
-        forceNodes_,
+        &numRestrNodes_,
         &numFixedForceNodes_,
-        &time,
-        &lPoints,
-        g_coord_pp_OF_,
+        &dtim,
         g_g_pp_OF_,
         g_num_pp_OF_,
+        g_coord_pp_OF_,
         gravlo_,
         ptDtemp_,
         ptUtemp_,

@@ -584,7 +584,7 @@
 
         END DO ! Gauss Points
 
-	! k = k_l + k_nl
+        ! k = k_l + k_nl
         storekm_pp(:,:,iel) = kmat_elem(:,:) + kgeo_elem(:,:)
 
         ! M
@@ -605,9 +605,7 @@
 !-------------------------------------------------------------------------
 ! 9. Newmark Scheme
 !-------------------------------------------------------------------------
-
-
-    
+ 
     ! New mark parameters
     ! Damping excluded
     ! Finite element procedures in engineering analysis, K‐J. Bathe, Prentice‐Hall, 1982, doi:10.1002/nag.1610070412

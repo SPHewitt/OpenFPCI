@@ -58,7 +58,7 @@ extern"C"
     // Called at construction
     void initnl_
     (
-        double* g_coord,	
+        double* g_coord,
         int* rest,
         int* nn,
         int* nr,
@@ -76,26 +76,7 @@ extern"C"
     // return number of cells/proc
     int setnelspp_
     (
-	const int* numCells
-//	int* numProcessors
-    );
-
-    // Calculate number of cells/proc
-    int calcnelsppof_
-    (
-	int* numElements,
-	int* numProcessors
-    );
-
-
-    // Print out the Force to Ensignt Format
-    void checkforce_
-    (
-        double* force,
-        int* sense, 
-        int* node,
-        int* solidPatchIDSize,
-        int* solidMeshSize
+        const int* numCells
     );
 
     // Solve the structural equation
@@ -103,43 +84,33 @@ extern"C"
     (
         int* node,
         double* val, 
-	double* numVar,
+        double* numVar,
         double* matProp,
         int* nr,
         int* loadedNodes,
-	double* time,
+        double* time,
         int* g_g_pp,
         int* g_num_pp,
         double* g_coord_pp,
-	double* gravlo,
-	double* ptDtemp_,
-	double* ptUtemp_,
-	double* ptAtmep_
+        double* gravlo,
+        double* ptDtemp_,
+        double* ptUtemp_,
+        double* ptAtmep_
     );
 
-	// Print ParaFem to file (ENSI GOLD)
-    void checkparafem_
-    (
-        double* mesh,
-        int* g_num,
-    	int* restraint,
-        int* nn,
-        int* nels
-    );
-
-	// Calculate Gravitational Loads 
+    // Calculate Gravitational Loads 
     void gloads_
     (
-	double* gravlo,
-	double* gravity,
-	int* nn,
-	int* nodof,
-	const int* nod,
-	const int* ndim,
-	int* nr,
-	double*	g_coord,
-	int* g_num_pp,
-	int* rest
+       double* gravlo,
+       double* gravity,
+       int* nn,
+       int* nodof,
+       const int* nod,
+       const int* ndim,
+       int* nr,
+       double*	g_coord,
+       int* g_num_pp,
+       int* rest
     );
 }
 
@@ -1775,8 +1746,6 @@ bool femLargeStrain::evolve()
     Info << "Evolving solid solver: " 
         << femLargeStrain::typeName << endl;
     
-    //label lPoints = mesh().points().size();
-    //double time = mesh().time().value();
     double dtim = runTime().deltaT().value();
 
     label tmp = Pstream::myProcNo();
@@ -1818,18 +1787,18 @@ bool femLargeStrain::evolve()
     (
         forceNodes_,
         fext_OF_,
-	numSchemes_,
+        numSchemes_,
         solidProps_,
         &numRestrNodes_,
         &numFixedForceNodes_,
-	&dtim,
+        &dtim,
         g_g_pp_OF_,
         g_num_pp_OF_,
         g_coord_pp_OF_,
         gravlo_,
-	ptDtemp_,
-	ptUtemp_,
-	ptAtemp_
+        ptDtemp_,
+        ptUtemp_,
+        ptAtemp_
     );
 
 

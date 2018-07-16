@@ -198,9 +198,8 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE runl(numVar,sProp,val,node,loaded_nodes,time,nodes_pp,g_coord_pp,&
-                      g_g_pp,g_num_pp,gravlo,Dfield,Ufield,Afield)
-  
+  SUBROUTINE runl(node,val,num_var,mat_prop,nr,loaded_nodes,time_step, &
+                  g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield)
   !/****f* parafeml/runl
   !*  NAME
   !*    SUBROUTINE: runl
@@ -222,13 +221,12 @@
   !*    output.
   !*
   !*  INPUTS
-  !*    numVar      (a1 b1 theta dTim)   - Numerical Variables
+  !*    num_var     (a1 b1 theta dTim)   - Numerical Variables
   !*    val         (ndim,loaded_nodes)	 - Force vector of loaded nodes
   !*    node        (loaded_nodes)       - Node # of loaded_nodes
   !*
   !*    loaded_nodes                     - # of loaded nodes
-  !*    time                             - Current time
-  !*    nodes_pp                         - # of nodes per cores
+  !*    time_step                        - time step
   !*
   !*    g_g_pp      (ntot,nels_pp)       - Equation steering matrix
   !*    g_num_pp    (nod,nels_pp)        - Element steering matrix
@@ -236,7 +234,7 @@
   !*    store_mm_pp (ntot,ntot,nels_pp)  - Mass Matrix [M]
   !*
   !*    diag_precon_pp (neq_pp)          - Diagonal Preconditioner
-  !*    gravlo         (neq_pp)          - Vector of gravity loads
+  !*    gravlo_pp         (neq_pp)       - Vector of gravity loads
   !*
   !*  OUTPUT
   !*    Dfield  (ntot,nels_pp)           - Nodal displacements
@@ -263,16 +261,16 @@
   REAL(iwp),PARAMETER      :: zero=0.0_iwp,one=1.0_iwp
   
   INTEGER,INTENT(INOUT)    :: loaded_nodes,node(loaded_nodes)
-  INTEGER,INTENT(INOUT)    :: g_num_pp(nod,nels_pp),nodes_pp
-  INTEGER,INTENT(INOUT)    :: g_g_pp(ntot,nels_pp)
+  INTEGER,INTENT(INOUT)    :: g_num_pp(nod,nels_pp)
+  INTEGER,INTENT(INOUT)    :: g_g_pp(ntot,nels_pp),nr
   
   INTEGER                  :: iel,i,j,k,l,m,n,iters,printres
   INTEGER                  :: limit,nels,node_end,node_start
   INTEGER                  :: nlen,myCount,disps(npes),flag
   INTEGER                  :: nodesCount(npes),RSS,VM,RSSa,VMa  
 
-  REAL(iwp),INTENT(IN)      :: sProp(3)
-  REAL(iwp),INTENT(IN)      :: numVar(4),time,gravlo(neq_pp)
+  REAL(iwp),INTENT(IN)      :: mat_prop(3)
+  REAL(iwp),INTENT(IN)      :: num_var(4),time_step,gravlo_pp(neq_pp)
 
   REAL(iwp),INTENT(INOUT)  :: g_coord_pp(nod,ndim,nels_pp)
   REAL(iwp),INTENT(INOUT)  :: val(ndim,loaded_nodes)
@@ -282,6 +280,8 @@
   REAL(iwp)                :: tol,up,alpha,beta,alpha1,beta1,theta,dtim
   REAL(iwp)                :: c1,c2,c3,c4
   REAL(iwp)                :: X,Y,Z
+
+  REAL(iwp),SAVE           :: time_step_orig
   
   LOGICAL                  :: converged
   CHARACTER(LEN=50)        :: argv
@@ -310,13 +310,25 @@
   IF(numpe .EQ. 1)PRINT*,"ParaFEM: "
 
   IF(.NOT. ALLOCATED(diag_precon_pp))THEN
+    
+    time_step_orig = time_step
+
     ALLOCATE(diag_precon_pp(neq_pp),store_km_pp(ntot,ntot,nels_pp),&
              store_mm_pp(ntot,ntot,nels_pp))
 
     store_km_pp = zero; store_mm_pp=zero;diag_precon_pp=zero;
+    CALL finddiagprecon(store_km_pp,store_mm_pp,g_coord_pp,num_var,mat_prop, &
+                   diag_precon_pp,time_step)
+  ENDIF
 
-    CALL finddiagprecon(store_km_pp,store_mm_pp,g_coord_pp,numVar,sProp, &
-                   diag_precon_pp)
+  IF(time_step_orig .NE. time_step)THEN
+    ! NOTE : Accuracy of this in FSI context not been checked
+    IF(numpe .EQ. 1)PRINT*,"Time Step Updated"
+ 
+    time_step_orig = time_step
+    store_km_pp = zero; store_mm_pp=zero;diag_precon_pp=zero;
+    CALL finddiagprecon(store_km_pp,store_mm_pp,g_coord_pp,num_var,mat_prop, &
+                   diag_precon_pp,time_step)
   ENDIF
   
   ! Barrier (may not be needed but safe)
@@ -330,15 +342,16 @@
   element  =  "hexahedron"  ! Element Name
   
   ! Set Numerical and Material Values 
-  alpha1  =  numVar(1)
-  beta1   =  numVar(2)
-  theta   =  numVar(3)
-  dtim	  =  numVar(4)  
+  alpha1  =  num_var(1)
+  beta1   =  num_var(2)
+  theta   =  num_var(3)
+  !dtim	  =  num_var(4)  
+   dtim   =  time_step
 
-  c1	    =  (1._iwp-theta)*dtim
-  c2	    =  beta1-c1
-  c3	    =  alpha1+1._iwp/(theta*dtim);
-  c4	    =  beta1+theta*dtim
+  c1      =  (1._iwp-theta)*dtim
+  c2      =  beta1-c1
+  c3      =  alpha1+1._iwp/(theta*dtim);
+  c4      =  beta1+theta*dtim
 
   printres=0
 
@@ -378,7 +391,7 @@
  
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
  
-  fext_pp=fext_pp+gravlo  ! Adding gravity if set
+  fext_pp=fext_pp+gravlo_pp  ! Adding gravity if set
 
   timest(3)=elap_time()
   
@@ -503,7 +516,7 @@
   timest(7) = elap_time()
   
 !------------------------------------------------------------------------------
-! 11. Gather Data from ntot,nels_pp to ndim,nodes_pp
+! 11. Gather Data from ntot,nels_pp to ndim
 !------------------------------------------------------------------------------
 
   IF(.NOT.ALLOCATED(eld_pp))THEN

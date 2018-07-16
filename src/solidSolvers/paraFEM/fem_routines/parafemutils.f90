@@ -50,7 +50,7 @@
   !*/
 
   SUBROUTINE finddiagprecon(store_km_pp,store_mm_pp,g_coord_pp,numVar,&
-                            sProp,diag_precon_pp)
+                            sProp,diag_precon_pp,time_step)
   !/****f* parafeml/finddiagprecon
   !*  NAME
   !*    SUBROUTINE: finddiagprecon
@@ -68,6 +68,7 @@
   !*    store_mm_pp (ntot,ntot,nels_pp)  - Mass Matrix
   !*
   !*    numVar      (a1 b1 theta dTim)   - Numerical Variables
+  !*    time_step                        - time step
   !*    sProp       (e,v,rho)            - Rheology Properties
   !*
   !*  OUTPUT
@@ -97,7 +98,7 @@
   REAL(iwp),INTENT(INOUT)   :: store_km_pp(ndim*nod,ndim*nod,nels_pp)
   REAL(iwp),INTENT(INOUT)   :: store_mm_pp(ndim*nod,ndim*nod,nels_pp)
   REAL(iwp),INTENT(INOUT)   :: g_coord_pp(nod,ndim,nels_pp)
-  REAL(iwp),INTENT(IN)      :: numVar(4),sProp(3)
+  REAL(iwp),INTENT(IN)      :: numVar(4),sProp(3),time_step
   
   REAL(iwp),INTENT(INOUT)   :: diag_precon_pp(neq_pp)
   
@@ -126,7 +127,7 @@
   alpha1  =  numVar(1)
   beta1   =  numVar(2)
   theta   =  numVar(3)
-  dtim    =  numVar(4)
+  dtim    =  time_step !numVar(4)
   c3      =  alpha1+1._iwp/(theta*dtim)
   c4      =  beta1+theta*dtim
   ndof    =  ntot
