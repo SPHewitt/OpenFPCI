@@ -1612,8 +1612,9 @@
   !*
    USE precision; USE global_variables;
    IMPLICIT NONE
-   INTEGER,INTENT(IN) :: nCells	
+   INTEGER,INTENT(IN) :: nCells
    nels_pp=nCells
+   setnelspp=1
    RETURN
   END FUNCTION
 
