@@ -673,23 +673,42 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     g_coord_pp_OF_  =  new double [nod*ndim*nels_pp_OF];
 
     // Newmarks method 
-
     double beta (readScalar(solidProperties().lookup("beta")));
     double delta (readScalar(solidProperties().lookup("delta")));
     
-    //double timestep (readScalar(solidProperties().lookup("timeStep")));
-    //double theta (readScalar(solidProperties().lookup("theta")));
+    // Tolerances    
+    // Default Values
+    double tol   = 1e-6;
+    double tol2  = 1e-5;
+    double limit = 1000;
     
-    numSchemes_ 	=  new double[4];
-    numSchemes_[0] 	=  beta;
-    numSchemes_[1] 	=  delta;
-    numSchemes_[2] 	=  0.0; //theta;
-    numSchemes_[3] 	=  0.0; //timestep;
+    if (solidProperties().found("PCGTolerance"))
+    {
+        tol = readScalar(solidProperties().lookup("PCGTolerance"));
+    }
+    
+    if (solidProperties().found("PCGLimit"))
+    {
+        limit = readScalar(solidProperties().lookup("PCGLimit"));
+    }
+    
+    if (solidProperties().found("NRTolerance"))
+    {
+        tol2 = readScalar(solidProperties().lookup("NRTolerance"));
+    }
+    
+    
+    numSchemes_     =  new double[5];
+    numSchemes_[0]  =  beta;  // Beta  (Typically = 0.25)
+    numSchemes_[1]  =  delta; // Delta (Typically = 0.5)
+    numSchemes_[2]  =  tol;   // Tolerance for PCG loop
+    numSchemes_[3]  =  limit; // Max number of PCG iterations
+    numSchemes_[4]  =  tol2;  // Tolerance for NR Loop
 
-    solidProps_ 	=  new double[3];
-    solidProps_[0] 	=  E_;
-    solidProps_[1] 	=  nu_;
-    solidProps_[2] 	=  rhotmp_;
+    solidProps_     =  new double[3];
+    solidProps_[0]  =  E_;
+    solidProps_[1]  =  nu_;
+    solidProps_[2]  =  rhotmp_;
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());

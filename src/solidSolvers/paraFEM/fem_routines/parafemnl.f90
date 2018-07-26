@@ -230,7 +230,7 @@
   INTEGER                   :: nodes_pp, node_start
   INTEGER                   :: node_end, idx1, idx2
 
-  REAL(iwp),INTENT(IN)      :: num_var(4),mat_prop(3),timeStep,g_coord_pp(nod,ndim,nels_pp)
+  REAL(iwp),INTENT(IN)      :: num_var(5),mat_prop(3),timeStep,g_coord_pp(nod,ndim,nels_pp)
 
   REAL(iwp),INTENT(INOUT)   :: gravlo_pp(neq_pp)
   REAL(iwp),INTENT(INOUT)   :: Dfield(ntot,nels_pp),Ufield(ntot,nels_pp)
@@ -240,7 +240,7 @@
   REAL(iwp)                 :: e,v,rho,det,tol, maxdiff, tol2, detF
   REAL(iwp)                 :: energy, energy1, rn0
   REAL(iwp)                 :: a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10
-  REAL(iwp)                 :: dtim,beta,delta,alpha
+  REAL(iwp)                 :: dtim,beta,delta
 
   REAL(iwp)                 :: xi,eta,zeta,etam,xim,zetam,etap,xip,zetap
 
@@ -303,22 +303,20 @@
   argv       =  "Case"       ! Name files write to
   nlen       =  4            ! Length of Name
   nip        =  8            ! Number of Integration Points
-  limit      =  3000         ! Max number of Interation in PCG
-  tol        =  1.0e-8       ! Tolerance of PCG loop
   element    =  "hexahedron" ! Element Name
 
-  num_load_steps = 1         ! Number of load steps		
-                             ! with a non-zero applied value
+  num_load_steps = 1         ! Number of load steps
 
-  tol2 = 1.0e-16             ! Tolerance for Newton-Raphson loop
+  dimH       = 8             ! dimH = dim
 
-  dimH = 8		     ! NOT SURE WHAT THIS VARIABLE DOES
+  printres   = 0             ! Write .res file
 
-  printres = 0               ! Write .res file
-  
   ! Set Numerical and Material Values 
-  alpha   =  num_var(1)
-  delta   =  num_var(2)
+  beta   =  num_var(1)    ! Beta  (Typically = 0.25)
+  delta  =  num_var(2)    ! Delta (Typically = 0.5)
+  tol    =  num_var(3)    ! Tolerance of PCG loop
+  limit  =  num_var(4)    ! Max number of Interation in PCG
+  tol2   =  num_var(5)    ! Tolerance for Newton-Raphson loop
 
   dtim    =  timeStep
 
@@ -611,17 +609,17 @@
     ! Finite element procedures in engineering analysis, K‐J. Bathe, Prentice‐Hall, 1982, doi:10.1002/nag.1610070412
     ! Pages 511-513
 
-     a0  = 1.0/(alpha*(dtim**2.0))
-     a1  = zero  ! delta/(alpha*dtim)
-     a2  = 1.0/(alpha*dtim)
-     a3  = (1.0/( 2.0*alpha)) -1.0
-     a4  = zero ! (delta/alpha) - 1.0
-     a5  = zero ! (delta/2)*((delta/alpha)-2.0)
+     a0  = 1.0/(beta*(dtim**2.0))
+     a1  = zero  ! delta/(beta*dtim)
+     a2  = 1.0/(beta*dtim)
+     a3  = (1.0/( 2.0*beta)) -1.0
+     a4  = zero ! (delta/beta) - 1.0
+     a5  = zero ! (delta/2)*((delta/beta)-2.0)
 
     ! Diverges from book due to exclusion of damping
-     a6  = 1.0/(alpha*(dtim**2.0))
-     a7  = -1.0/(alpha*dtim)
-     a8  = -( (1.0/(2.0*alpha) ) -1.0)
+     a6  = 1.0/(beta*(dtim**2.0))
+     a7  = -1.0/(beta*dtim)
+     a8  = -( (1.0/(2.0*beta) ) -1.0)
      a9  = dtim*(1-delta)
      a10 = delta*dtim
 
