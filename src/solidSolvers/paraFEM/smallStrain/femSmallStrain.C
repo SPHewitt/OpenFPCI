@@ -645,14 +645,29 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
 
     double alpha1 (readScalar(solidProperties().lookup("alpha1")));
     double beta1 (readScalar(solidProperties().lookup("beta1")));
-    double timestep = mesh.time().deltaTValue();
     double theta (readScalar(solidProperties().lookup("theta")));
     
-    numSchemes_ 	=  new double[4];
+    // Tolerances    
+    // Default Values
+    double tol   = 1e-6;
+    double limit = 1000;
+    
+    if (solidProperties().found("PCGTolerance"))
+    {
+        tol = readScalar(solidProperties().lookup("PCGTolerance"));
+    }
+    
+    if (solidProperties().found("PCGLimit"))
+    {
+        limit = readScalar(solidProperties().lookup("PCGLimit"));
+    }
+    
+    numSchemes_ 	=  new double[5];
     numSchemes_[0] 	=  alpha1;
     numSchemes_[1] 	=  beta1;
     numSchemes_[2] 	=  theta;
-    numSchemes_[3] 	=  timestep;
+    numSchemes_[3] 	=  tol;
+    numSchemes_[4] 	=  limit;
 
     solidProps_ 	=  new double[3];
     solidProps_[0] 	=  E_;

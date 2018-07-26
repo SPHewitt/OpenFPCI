@@ -270,7 +270,7 @@
   INTEGER                  :: nodesCount(npes),RSS,VM,RSSa,VMa  
 
   REAL(iwp),INTENT(IN)      :: mat_prop(3)
-  REAL(iwp),INTENT(IN)      :: num_var(4),time_step,gravlo_pp(neq_pp)
+  REAL(iwp),INTENT(IN)      :: num_var(5),time_step,gravlo_pp(neq_pp)
 
   REAL(iwp),INTENT(INOUT)  :: g_coord_pp(nod,ndim,nels_pp)
   REAL(iwp),INTENT(INOUT)  :: val(ndim,loaded_nodes)
@@ -307,7 +307,7 @@
 !------------------------------------------------------------------------------
 ! 3. Start Program
 !------------------------------------------------------------------------------
-  IF(numpe .EQ. 1)PRINT*,"ParaFEM: "
+  IF(numpe .EQ. 1)PRINT*,"ParaFEM Small Strain Solver:"
 
   IF(.NOT. ALLOCATED(diag_precon_pp))THEN
     
@@ -337,16 +337,16 @@
   ! Set Base paramenter
   argv     =  "Case"        ! Name files write to
   nlen     =  4             ! Length of Name
-  limit    =  1000          ! Max number of Interation in PCG
-  tol      =  1e-6          ! Tolerance of PCG loop
   element  =  "hexahedron"  ! Element Name
   
   ! Set Numerical and Material Values 
-  alpha1  =  num_var(1)
-  beta1   =  num_var(2)
-  theta   =  num_var(3)
-  !dtim	  =  num_var(4)  
-   dtim   =  time_step
+  alpha1  =  num_var(1)    ! Rayleigh damping parameters
+  beta1   =  num_var(2)    ! Rayleigh damping parameters
+  theta   =  num_var(3)    ! Linear time interpolator (0.5 to 1)
+  tol     =  num_var(4)    ! Tolerance of PCG loop
+  limit   =  num_var(5)    ! Max number of Interation in PCG
+
+  dtim   =  time_step
 
   c1      =  (1._iwp-theta)*dtim
   c2      =  beta1-c1
@@ -462,8 +462,6 @@
 !------------------------------------------------------------------------------
 
   IF(ABS(SUM_P(loads_pp)) .GE. 1E-10)THEN
-    IF(numpe .EQ. 1)PRINT*,"Solving using PCG"
-    !CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
    
     d_pp  =  diag_precon_pp*loads_pp
     p_pp  =  d_pp
@@ -503,9 +501,9 @@
 !------------------------------------------------------------------------------
    !CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
    
-   IF(numpe .EQ. 1)PRINT*,"Number of Iterations: ",iters
+   IF(numpe .EQ. 1)PRINT*,"Number of PCG Iterations: ",iters
    ENDIF
-   x1_pp	  =  xnew_pp
+   x1_pp	=  xnew_pp
    utemp_pp	=  zero
    d1x1_pp	=  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
    d2x1_pp	=  (d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta

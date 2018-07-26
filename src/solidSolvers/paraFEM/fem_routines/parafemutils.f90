@@ -16,7 +16,7 @@
   !*    The routines provide an interface between Foam-Extend and 
   !*    ParaFEM.
   !* 
-  !*    Subroutine           Purpose  	  
+  !*    Subroutine           Purpose    
   !*
   !*    finddiagprecon       Generate K,M and the diagonal preconditioner
   !*    checkparafem         Writes mesh and geometry to file (ensi)

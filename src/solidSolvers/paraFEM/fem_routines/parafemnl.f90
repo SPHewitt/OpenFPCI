@@ -294,7 +294,7 @@
 ! 3. Start Program
 !------------------------------------------------------------------------------
 
-  IF(numpe .EQ. 1)PRINT*,"ParaFEM: "
+  IF(numpe .EQ. 1)PRINT*,"ParaFEM Large Strain Solver: "
   
   ! Barrier (may not be needed but safe)
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
@@ -731,7 +731,8 @@
 
     END DO iterations
    
-   IF(numpe .EQ. 1)WRITE(*,'(a,I3)')," Newton-Raphson Iters: ",inewton
+   IF(numpe .EQ. 1)WRITE(*,'(a,I3,a,ES10.3)')," Newton-Raphson Iters: ",inewton,&
+                                        ",  Final residual: ", (energy/energy1)
 
    nr_timest(inewton,7)= elap_time()-timest(14)
  
