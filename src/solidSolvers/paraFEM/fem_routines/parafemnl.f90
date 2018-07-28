@@ -8,21 +8,20 @@
   !*    The group of subroutines makes up the routines required to
   !*    solve the forced vibration of a 3D linear elastic solid
   !*    assuming the material undergoes large strain. 
-  !*	
+  !*
   !*  FUNCTION
   !*    These routines are based on the decomposition of program xx7 
-  !*    which is a development program being developed by "XXX" to 
+  !*    which is a development program within ParaFEM" to 
   !*    solve the forced vibration problems of materials using the
-  !*    large strain assumption 
-  !*    
-  !*    Subroutine           Purpose  	  
+  !*    large strain assumption.
+  !*
+  !*    Subroutine           Purpose    
   !*
   !*    initnl                Generates initial matricies and arrays
-  !*    pop_gcoordpp          Populates g_coord_pp
   !*    runnl                 Solves the governing equations
   !*
   !*  AUTHOR
-  !* 	  S.Hewitt
+  !*     S.Hewitt
   !*  COPYRIGHT
   !*    (c) University of Manchester 1996-2017
   !******
@@ -33,7 +32,6 @@
   !--------------------------------------------------------------------
 
   SUBROUTINE initnl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
-
   !/****f* parafeml/initnl
   !*  NAME
   !*    SUBROUTINE: initnl
@@ -45,21 +43,21 @@
   !*  FUNCTION
   !*    Initialises ParaFEM, this inculdes initialising the MPI
   !*    Passing mesh information from OpenFOAM into ParaFEM and  
-  !*	creating the steering matrix (g_g_pp).
+  !*    creating the steering matrix (g_g_pp).
   !*
   !*  INPUTS
-  !*    g_coord   (ndim,nn)     - Coordinates of the mesh		
-  !*    g_num_pp  (nod,nels_pp) - Steering matrix				
-  !*    rest      (nr,nodof+1)  - Restrained Nodes, e.g.(# x y z)
+  !*    g_coord   (ndim,nn)             - Coordinates of the mesh
+  !*    rest      (nr,nodof+1)          - Restrained Nodes, e.g.(# x y z)
   !*
-  !*    nn                      - Number of Nodes
-  !*    nr                      - Number of restrained Nodes	 
-  !*	  			
+  !*    nn                              - Number of Nodes
+  !*    nr                              - Number of restrained Nodes 
+  !*
+  !*    g_num_pp  (nod,nels_pp)         - Distributed element steering array
+  !*
   !*  OUTPUT
-  !*    g_g_pp      (ntot,nels_pp)      - Global Steering Matrix
-  !*    g_coord_pp  (nod,ndim,nels_pp)  - Coordinate steering 
-
-  !*			
+  !*    g_g_pp      (ntot,nels_pp)      - Distributed equation steering array
+  !*    g_coord_pp  (nod,ndim,nels_pp)  - Distributed nodal cooridnates 
+  !*
   !*  AUTHOR
   !*    S. Hewitt
   !******
@@ -198,6 +196,54 @@
 
   SUBROUTINE runnl(node,val,num_var,mat_prop,nr,loaded_nodes,timeStep, 	&
                       g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield)
+  !/****f* parafemnl/runnl
+  !*  NAME
+  !*    SUBROUTINE: runnl
+  !*
+  !*  SYNOPSIS
+  !*    Usage:     runnl_(forceNodes_,fext_OF_,numSchemes_,solidProps_,
+  !*                     &numRestrNodes_,&numFixedForceNodes_, &dtim,
+  !*                     g_g_pp_OF_,g_num_pp_OF_,g_coord_pp_OF_,gravlo_,
+  !*                     ptDtemp_,ptUtemp_,ptAtemp_);
+  !* 
+  !*  FUNCTION
+  !*    Reads in the current timesteps displacement, velocity, 
+  !*    acceleration and external force field. Loads the structure    
+  !*    and solves the governing equations of the problem
+  !*
+  !*        {R} = {Fint} - {Fext} + [M]{a} + [K]{d}
+  !*
+  !*    The new displacement, velocity and acceleration fields are
+  !*    output. This subroutine is used for problems with finite strain
+  !*
+  !*  INPUTS
+  !*    val         (ndim,loaded_nodes)	 - Force vector of loaded nodes
+  !*    node        (loaded_nodes)       - Node # of loaded_nodes
+  !*    num_var     (a1 b1 theta dTim)   - Numerical Variables
+  !*    mat_prop    (e v rho)            - Material Properties
+  !*
+  !*    nr                               - Number of restrained nodes
+  !*    loaded_nodes                     - Number of loaded nodes
+  !*    time_step                        - time step
+  !*
+  !*    g_g_pp      (ntot,nels_pp)       - Distributed equation steering array
+  !*    g_num_pp    (nod,nels_pp)        - Distributed element steering array
+  !*    g_coord_pp  (nod,nels_pp)        - Distributed nodal coordinates
+  !*    store_km_pp (ntot,ntot,nels_pp)  - Distributed stiffness matrix [k]
+  !*    store_mm_pp (ntot,ntot,nels_pp)  - Distributed mass matrix [M]
+  !*
+  !*    diag_precon_pp (neq_pp)          - Distributed diagonal preconditioner
+  !*    gravlo_pp      (neq_pp)          - Vector of gravity loads
+  !*
+  !*  OUTPUT
+  !*    Dfield  (ntot,nels_pp)           - Distributed nodal displacements
+  !*    Ufield  (ntot,nels_pp)           - Distributed nodal velocities
+  !*    Afield  (ntot,nels_pp)           - Distributed nodal accelerations
+  !*
+  !*  AUTHOR
+  !*    S. Hewitt
+  !******
+  !*/
   
   USE mpi_wrapper;     USE precision;    USE global_variables; 
   USE mp_interface;    USE input;        USE output; 

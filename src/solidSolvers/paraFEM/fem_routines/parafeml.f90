@@ -38,7 +38,6 @@
   !--------------------------------------------------------------------
 
   SUBROUTINE initl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
-
   !/****f* parafeml/initl
   !*  NAME
   !*    SUBROUTINE: initl
@@ -53,16 +52,17 @@
   !*    creating the steering matrix (g_g_pp).
   !*
   !*  INPUTS
-  !*    g_coord   (ndim,nn)     - Coordinates of the mesh
-  !*    g_num_pp  (nod,nels_pp) - Steering matrix
-  !*    rest      (nr,nodof+1)  - Restrained Nodes, e.g.(# x y z)
+  !*    g_coord   (ndim,nn)             - Coordinates of the mesh
+  !*    rest      (nr,nodof+1)          - Restrained Nodes, e.g.(# x y z)
   !*
-  !*    nn                      - Number of Nodes
-  !*    nr                      - Number of restrained Nodes
+  !*    nn                              - Number of Nodes
+  !*    nr                              - Number of restrained Nodes 
+  !*
+  !*    g_num_pp  (nod,nels_pp)         - Distributed element steering array
   !*
   !*  OUTPUT
-  !*    g_g_pp      (ntot,nels_pp)      - Global Steering Matrix
-  !*    g_coord_pp  (nod,ndim,nels_pp)  - Coordinate steering 
+  !*    g_g_pp      (ntot,nels_pp)      - Distributed equation steering array
+  !*    g_coord_pp  (nod,ndim,nels_pp)  - Distributed nodal cooridnates 
   !*
   !*  AUTHOR
   !*    S. Hewitt
@@ -205,10 +205,10 @@
   !*    SUBROUTINE: runl
   !*
   !*  SYNOPSIS
-  !*    Usage: runl_(numSchemes_,fext_OF_,forceNodes_,          &
-  !*            &numFixedForceNodes_,&time,&lPoints,g_g_pp_OF_,       &
-  !*            g_num_pp_OF_,store_km_pp_OF_,store_mm_pp_OF_,         &
-  !*            diag_precon_pp_OF_,gravlo_,ptDtemp_,ptUtemp_,ptAtemp_);
+  !*    Usage:     runl_(forceNodes_,fext_OF_,numSchemes_,solidProps_,
+  !*                     &numRestrNodes_,&numFixedForceNodes_, &dtim,
+  !*                     g_g_pp_OF_,g_num_pp_OF_,g_coord_pp_OF_,gravlo_,
+  !*                     ptDtemp_,ptUtemp_,ptAtemp_);
   !* 
   !*  FUNCTION
   !*    Reads in the current timesteps displacement, velocity, 
@@ -218,28 +218,31 @@
   !*        {F} = [M]{a} + [C]{u} + [K]{d} 
   !*
   !*    The new displacement, velocity and acceleration fields are
-  !*    output.
+  !*    output. Note this subroutine is used for problems with infinte strain.
   !*
   !*  INPUTS
-  !*    num_var     (a1 b1 theta dTim)   - Numerical Variables
   !*    val         (ndim,loaded_nodes)	 - Force vector of loaded nodes
   !*    node        (loaded_nodes)       - Node # of loaded_nodes
+  !*    num_var     (a1 b1 theta dTim)   - Numerical Variables
+  !*    mat_prop    (e v rho)            - Material Properties
   !*
-  !*    loaded_nodes                     - # of loaded nodes
+  !*    nr                               - Number of restrained nodes
+  !*    loaded_nodes                     - Number of loaded nodes
   !*    time_step                        - time step
   !*
-  !*    g_g_pp      (ntot,nels_pp)       - Equation steering matrix
-  !*    g_num_pp    (nod,nels_pp)        - Element steering matrix
-  !*    store_km_pp (ntot,ntot,nels_pp)  - Stiffness Matrix [k]
-  !*    store_mm_pp (ntot,ntot,nels_pp)  - Mass Matrix [M]
+  !*    g_g_pp      (ntot,nels_pp)       - Distributed equation steering array
+  !*    g_num_pp    (nod,nels_pp)        - Distributed element steering array
+  !*    g_coord_pp  (nod,nels_pp)        - Distributed nodal coordinates
+  !*    store_km_pp (ntot,ntot,nels_pp)  - Distributed stiffness matrix [k]
+  !*    store_mm_pp (ntot,ntot,nels_pp)  - Distributed mass matrix [M]
   !*
-  !*    diag_precon_pp (neq_pp)          - Diagonal Preconditioner
-  !*    gravlo_pp         (neq_pp)       - Vector of gravity loads
+  !*    diag_precon_pp (neq_pp)          - Distributed diagonal preconditioner
+  !*    gravlo_pp      (neq_pp)          - Vector of gravity loads
   !*
   !*  OUTPUT
-  !*    Dfield  (ntot,nels_pp)           - Nodal displacements
-  !*    Ufield  (ntot,nels_pp)           - Nodal velocities
-  !*    Afield  (ntot,nels_pp)           - Nodal accelerations
+  !*    Dfield  (ntot,nels_pp)           - Distributed nodal displacements
+  !*    Ufield  (ntot,nels_pp)           - Distributed nodal velocities
+  !*    Afield  (ntot,nels_pp)           - Distributed nodal accelerations
   !*
   !*  AUTHOR
   !*    S. Hewitt
@@ -450,10 +453,13 @@
 ! 8. Bulid Right Hand Side
 !------------------------------------------------------------------------------
 
-  loads_pp 	  =  fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
-  fext_o_pp 	=  fext_pp
-  loads_pp	  =  u_pp+vu_pp+loads_pp
-  temp_pp	    =  store_mm_pp*c3+store_km_pp*c4
+  loads_pp     =  fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
+  
+  ! fext_o_pp should be the previous timesteps value not the 
+  ! the previous iterations 
+  fext_o_pp    =  fext_pp
+  loads_pp     =  u_pp+vu_pp+loads_pp
+  temp_pp      =  store_mm_pp*c3+store_km_pp*c4
 
   timest(6) =  elap_time()
   
@@ -476,7 +482,7 @@
       CALL gather(p_pp,pmul_pp)
      
       elements_4: DO iel=1,nels_pp
- 	      CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,   &
+        CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,   &
                    pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
       END DO elements_4; 
       
@@ -503,13 +509,13 @@
    
    IF(numpe .EQ. 1)PRINT*,"Number of PCG Iterations: ",iters
    ENDIF
-   x1_pp	=  xnew_pp
-   utemp_pp	=  zero
-   d1x1_pp	=  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
-   d2x1_pp	=  (d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta
-   x0_pp	  =  x1_pp;
-   d1x0_pp	=  d1x1_pp
-   d2x0_pp	=  d2x1_pp;
+   x1_pp      =  xnew_pp
+   utemp_pp   =  zero
+   d1x1_pp    =  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta
+   d2x1_pp    =  (d1x1_pp-d1x0_pp)/(theta*dtim)-d2x0_pp*(1._iwp-theta)/theta
+   x0_pp      =  x1_pp;
+   d1x0_pp    =  d1x1_pp
+   d2x0_pp    =  d2x1_pp;
    
   timest(7) = elap_time()
   
