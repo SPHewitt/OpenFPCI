@@ -92,7 +92,8 @@ extern"C"
         double* gravlo,
         double* ptDtemp_,
         double* ptUtemp_,
-        double* ptAtmep_
+        double* ptAtmep_,
+        double* flag
     );
 
     // Calculate Gravitational Loads 
@@ -147,6 +148,7 @@ femSmallStrain::femSmallStrain(const fvMesh& mesh)
     E_(0),
     nu_(0),
     rhotmp_(0),
+    timeflag_(0),
     gCells_(0),
     gPoints_(0),
     ptDtemp_(0),
@@ -1723,7 +1725,20 @@ bool femSmallStrain::evolve()
 {
     Info << "Evolving solid solver: " 
         << femSmallStrain::typeName << endl;
-    
+        
+    double femFlag = 1;
+        
+    if(timeflag_ == runTime().value())
+    {
+       femFlag = 1;
+    }
+    else //Next time Step
+    {
+       timeflag_= runTime().value();
+       femFlag = 2;
+    }
+        
+
     double dtim = runTime().deltaT().value();
 
     label tmp = Pstream::myProcNo();
@@ -1776,7 +1791,8 @@ bool femSmallStrain::evolve()
         gravlo_,
         ptDtemp_,
         ptUtemp_,
-        ptAtemp_
+        ptAtemp_,
+        &femFlag
     );
 
 

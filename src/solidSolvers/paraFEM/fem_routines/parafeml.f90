@@ -199,7 +199,7 @@
   !--------------------------------------------------------------------
 
   SUBROUTINE runl(node,val,num_var,mat_prop,nr,loaded_nodes,time_step, &
-                  g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield)
+                  g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield,flag)
   !/****f* parafeml/runl
   !*  NAME
   !*    SUBROUTINE: runl
@@ -269,10 +269,10 @@
   
   INTEGER                  :: iel,i,j,k,l,m,n,iters,printres
   INTEGER                  :: limit,nels,node_end,node_start
-  INTEGER                  :: nlen,myCount,disps(npes),flag
+  INTEGER                  :: nlen,myCount,disps(npes)
   INTEGER                  :: nodesCount(npes),RSS,VM,RSSa,VMa  
 
-  REAL(iwp),INTENT(IN)      :: mat_prop(3)
+  REAL(iwp),INTENT(IN)      :: mat_prop(3),flag
   REAL(iwp),INTENT(IN)      :: num_var(5),time_step,gravlo_pp(neq_pp)
 
   REAL(iwp),INTENT(INOUT)  :: g_coord_pp(nod,ndim,nels_pp)
@@ -302,7 +302,7 @@
   REAL(iwp),SAVE,ALLOCATABLE:: temp(:),d1temp(:),d2temp(:),temp_pp(:,:,:)
   REAL(iwp),SAVE,ALLOCATABLE:: disp_pp(:),vel_pp(:),acel_pp(:),eld_pp(:,:)
   REAL(iwp),SAVE,ALLOCATABLE:: gDisp(:),gVel(:),gAcel(:)
-  REAL(iwp),SAVE,ALLOCATABLE:: fext_o_pp(:),timest(:)
+  REAL(iwp),SAVE,ALLOCATABLE:: fext_o_pp(:),timest(:),fext_tmp_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE:: diag_precon_pp(:),store_km_pp(:,:,:)
   REAL(iwp),SAVE,ALLOCATABLE:: store_mm_pp(:,:,:)
   
@@ -367,8 +367,8 @@
    ALLOCATE(x_pp(neq_pp),timest(20),xnew_pp(neq_pp),fext_pp(neq_pp))
    ALLOCATE(pmul_pp(ntot,nels_pp))
    ALLOCATE(utemp_pp(ntot,nels_pp),temp_pp(ntot,ntot,nels_pp))
-   ALLOCATE(fext_o_pp(neq_pp))
-   fext_o_pp  =  zero
+   ALLOCATE(fext_o_pp(neq_pp),fext_tmp_pp(neq_pp))
+   fext_o_pp  =  zero; fext_tmp_pp = zero
   ENDIF
     
   timest=zero 
@@ -454,10 +454,12 @@
 !------------------------------------------------------------------------------
 
   loads_pp     =  fext_pp*theta*dtim+(1-theta)*dtim*fext_o_pp
-  
-  ! fext_o_pp should be the previous timesteps value not the 
-  ! the previous iterations 
-  fext_o_pp    =  fext_pp
+
+  IF(flag .EQ. 2)THEN
+      fext_o_pp    =  fext_tmp_pp
+  ENDIF
+
+  fext_tmp_pp    =  fext_pp
   loads_pp     =  u_pp+vu_pp+loads_pp
   temp_pp      =  store_mm_pp*c3+store_km_pp*c4
 
