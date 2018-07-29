@@ -298,7 +298,7 @@ done
 
 
 printf "\nRecompiling FSI Library"
-printf "\nRecompiling FSI Library" >> $logFile
+printf "\nRecompiling FSI Library\n\n" >> $logfile
 
 # Remake the Library including new solidSolvers ans
 cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src/
