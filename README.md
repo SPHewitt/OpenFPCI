@@ -25,11 +25,13 @@ Foam-Extend and ParaFEM must be downloaded and compiled prior to the installatio
 git clone https://github.com/SPHewitt/OpenFPCI
 ```
 
-The third-party FSI library and OpenFPCI can be downloaded and compiled using the openfpci.sh script present in the src directory. The script assumes that both Foam-Extend and ParaFEM are installed in the home directory, i.e. $HOME/foam/foam-extend-X.X and $HOME/parafem-code/parafem. However if they are installed in different locations two inputs to the script are required:
+The third-party FSI library and OpenFPCI can be downloaded and compiled using the openfpci.sh script present in the src directory. The script assumes that both Foam-Extend and ParaFEM are installed with the system OpenMPI. The following command can be followed to install the software, where the paths should be replaced:
 
 ```
+echo "export PARAFEM_DIR="path/to/parafem-code/parafem" >> ~/.bashrc
+echo "export FOAM_DIR="path/to/foam/foam-extend.x.x" >> ~/.bashrc
 cd src
-./openfpci.sh -f "/path/to/foam-extend.x.x" -p "/path/to/parafem-code/parafem"
+./openfpci.sh
 ```
 
 The software has been tested with Foam-Extend-4.0 and ParaFEM.5.0.3 on a linux desktop running Ubuntu 16.04. The code has further been tested to The Computational Shared Facility at Manchester, the SGI system in Leeds (Polaris), The XC30 Cray system in Ediburugh (Archer) and the Tianhe2 Machine in Guangzhou China.
