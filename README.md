@@ -1,6 +1,6 @@
 # OpenFPCI
 
-OpenFOAM-ParaFEM Coupling Interface:
+Open source FOAM to ParaFEM Coupling Interface:
 
 ## Motivation
 
