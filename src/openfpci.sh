@@ -170,7 +170,7 @@ fi
 printf "\nFirst Fsi library compilation\n"
 printf "\nFirst Fsi library compilation\n" >> $logfile
 cd $WM_PROJECT_USER_DIR/FluidSolidInteraction/src
-#./Allwmake >> $logfile 2>&1
+./Allwmake >> $logfile 2>&1
 
 # Corrections to the Fuid Structure Interaction library
 # Foam Extend 4.0 Updated the fluxRequired methods which need adding
