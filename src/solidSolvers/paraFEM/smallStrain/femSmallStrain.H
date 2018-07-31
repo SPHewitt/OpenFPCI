@@ -150,6 +150,9 @@ class femSmallStrain
 
         //- temporary Density
         double rhotmp_;
+        
+        //- Time flag
+        double timeflag_;
 
         //- Total Cells
         int gCells_;
