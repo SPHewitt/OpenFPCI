@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Source bashrc
+. $FOAM_DIR/etc/bashrc
+
 # source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 

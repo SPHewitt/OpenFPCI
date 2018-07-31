@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Source Foam bashrc
-source $HOME/foam/foam-extend-4.0/etc/bashrc
+source $FOAM_DIR/etc/bashrc
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
@@ -9,15 +9,10 @@ source $HOME/foam/foam-extend-4.0/etc/bashrc
 # Get application name
 application=`getApplication`
 
+
 runApplication -l log.blockMesh.solid blockMesh -case ../solid
 runApplication -l log.setSet.solid setSet -case ../solid -batch ../solid/setBatch
 runApplication -l log.setToZones.solid setsToZones -case ../solid -noFlipMap
-
-cd ../solid
-cp -rf 0/polyMesh/sets constant/polyMesh/.
-cp -rf constant/polyMesh constant/oldPoints/.
-cd ../fluid
-
 
 runApplication blockMesh
 runApplication setSet -batch setBatch

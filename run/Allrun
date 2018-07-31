@@ -14,20 +14,20 @@ for case in $casefiles
 do
    (cd $case && runApplication blockMesh)
 
-   if [ "$case" = "CSM3" ]
-   then
-       (cd $case && runApplication solidFoam)
-   fi
-
-   if [ "$case" = "CFD3" ]
-   then
-       (cd $case && runApplication fluidFoam)
-   fi
- 
-#   if [ "$case" == "FSI3"]
+#   if [ "$case" = "CSM3" ]
 #   then
-#      (cd $case && runApplication fsiFoam)
+#       (cd $case && runApplication solidFoam)
 #   fi
+
+#   if [ "$case" = "CFD3" ]
+#   then
+#       (cd $case && runApplication fluidFoam)
+#   fi
+ 
+    if [ "$case" == "FSI3"]
+    then
+      (cd $case && runApplication fsiFoam)
+    fi
 
 done
 # ----------------------------------------------------------------- end-of-file
