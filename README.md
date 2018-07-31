@@ -28,8 +28,8 @@ git clone https://github.com/SPHewitt/OpenFPCI
 The third-party FSI library and OpenFPCI can be downloaded and compiled using the openfpci.sh script present in the src directory. The script assumes that both Foam-Extend and ParaFEM are installed with the system OpenMPI. The following command can be followed to install the software, where the paths should be replaced:
 
 ```
-echo "export PARAFEM_DIR="path/to/parafem-code/parafem" >> ~/.bashrc
-echo "export FOAM_DIR="path/to/foam/foam-extend.x.x" >> ~/.bashrc
+echo "export PARAFEM_DIR=path/to/parafem-code/parafem" >> ~/.bashrc
+echo "export FOAM_DIR=path/to/foam/foam-extend.x.x" >> ~/.bashrc
 . ~/.bashrc
 cd OpenFPCI/src
 ./openfpci.sh
