@@ -941,19 +941,8 @@
    CASE('hexahedron')
      SELECT CASE(nod)
        CASE(8)
-	     ! Foam-Extend to Abaqus Format (Check)
-       ! temp(:)=vector(:)
-       ! vector(1)=temp(5)
-       ! vector(2)=temp(6)
-       ! vector(3)=temp(2)
-       ! vector(4)=temp(1)
-       ! vector(5)=temp(7)
-       ! vector(6)=temp(8)
-       ! vector(7)=temp(4)
-       ! vector(8)=temp(3)
-
-	     ! Foam-Extend to Smith-Griffiths:
-      	temp(:)      = vector(:)
+      ! Foam-Extend to Smith-Griffiths:
+        temp(:)      = vector(:)
         vector(1)  = temp(5)
         vector(2)  = temp(7)
         vector(3)  = temp(8)
@@ -963,6 +952,17 @@
         vector(7)  = temp(4)
         vector(8)  = temp(2)
     END SELECT
+    
+    CASE('tetrahedron')
+      SELECT CASE(nod)
+        CASE(4)
+        temp(:)      = vector(:)
+        vector(1)  = temp(1)
+        vector(2)  = temp(3)
+        vector(3)  = temp(2)
+        vector(4)  = temp(4)
+      END SELECT
+
   END SELECT
 
   END SUBROUTINE of2sg

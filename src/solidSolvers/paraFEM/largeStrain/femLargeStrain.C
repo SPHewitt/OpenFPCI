@@ -42,11 +42,8 @@ using namespace rbf;
 
 
 // * * * * * * * * * * * * ParaFEM Fortran Subroutines* * * * * * * * * * * * //
-// - Will need editing when more complex elements introduced
-const int nod 	=  8;        // Element type
 const int ndim 	=  3;	     // Number of Dimensions
-const int ntot	=  ndim*nod; // ntot
-
+    
 using namespace std;
 
 
@@ -60,6 +57,7 @@ extern"C"
     (
         double* g_coord,
         int* rest,
+        const int* nodes,
         int* nn,
         int* nr,
         int* g_num_pp,
@@ -86,6 +84,7 @@ extern"C"
         double* val, 
         double* numVar,
         double* matProp,
+        int* nodes,
         int* nr,
         int* loadedNodes,
         double* time,
@@ -286,6 +285,11 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     lambda_(rheology_.lambda()),
     interface_(NULL)
 {
+
+    // Look at first element to get number of nodes
+    const int nod 	=  mesh.cellPoints()[0].size();
+    const int ntot	=  ndim*nod; // ntot
+    
     pointD_.oldTime();
     pointU_.oldTime();
     pointA_.oldTime();
@@ -380,7 +384,6 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     // cellPoints() returns steering array
     const labelListList& cellPoints = mesh.cellPoints();
 
-
     label localIndex = 0;
  
     if(Pstream::parRun()==true)
@@ -391,7 +394,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 
 	    if (curCellPoints.size() != nod)
 	    {
-		Info << "Not a hex cell!" << endl;
+		Info << "Incorrect cell!" << endl;
 	    }
 
 	    for(label i=0;i<nod;i++)
@@ -408,7 +411,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
             
  	    if (curCellPoints.size() != nod)
             {
-                Info << "Not a hex cell!" << endl;
+                Info << "Incorrect cell!" << endl;
             }
 
             for(label i=0;i<nod;i++)
@@ -721,6 +724,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     (
         mPoints_,
         rest_,
+        &nod,
         &gPoints_,
         &numRestrNodes_,
         g_num_pp_OF_,
@@ -867,7 +871,9 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	    label counter=0;
 
 	    // nod represnets the max number of elements a node may hold
-	    labelList myLabel (nod,0);
+	    //labelList myLabel (nod,0);
+	    // This may be a massive overestimate
+            labelList myLabel (50,0);
 
 	    // for each value find position in steering matrix
 	    for(int i=0; i<nels_pp_OF*nod;i++)
@@ -885,11 +891,11 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 		    counter++;
 		}
 
-			index++;
+		index++;
 	    }	// end for loop	
 	    myLabel.resize(resizeval);
 	    of2pfmap_[pointI] = myLabel;
-
+            
 	} // end for all
 
     delete[] mPoints_;
@@ -1766,6 +1772,7 @@ bool femLargeStrain::evolve()
         << femLargeStrain::typeName << endl;
     
     double dtim = runTime().deltaT().value();
+    int nod = mesh().cellPoints()[0].size();
 
     label tmp = Pstream::myProcNo();
     reduce(tmp,sumOp<label>());
@@ -1808,6 +1815,7 @@ bool femLargeStrain::evolve()
         fext_OF_,
         numSchemes_,
         solidProps_,
+        &nod,
         &numRestrNodes_,
         &numFixedForceNodes_,
         &dtim,

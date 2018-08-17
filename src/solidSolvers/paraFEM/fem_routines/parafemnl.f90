@@ -31,7 +31,7 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE initnl(g_coord,rest,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
+  SUBROUTINE initnl(g_coord,rest,nod,nn,nr,g_num_pp,g_g_pp,g_coord_pp)
   !/****f* parafeml/initnl
   !*  NAME
   !*    SUBROUTINE: initnl
@@ -47,10 +47,11 @@
   !*
   !*  INPUTS
   !*    g_coord   (ndim,nn)             - Coordinates of the mesh
-  !*    rest      (nr,nodof+1)          - Restrained Nodes, e.g.(# x y z)
+  !*    rest      (nr,nodof+1)          - Restrained nodes, e.g.(# x y z)
   !*
-  !*    nn                              - Number of Nodes
-  !*    nr                              - Number of restrained Nodes 
+  !*    nod                             - Number of nodes per element
+  !*    nn                              - Number of nodes
+  !*    nr                              - Number of restrained nodes 
   !*
   !*    g_num_pp  (nod,nels_pp)         - Distributed element steering array
   !*
@@ -79,10 +80,10 @@
 !----------------------------------------------------------------------
 
 
-  INTEGER,PARAMETER         :: nodof=3,ndim=3,nst=6,nod=8
+  INTEGER,PARAMETER         :: nodof=3,ndim=3,nst=6
   REAL(iwp),PARAMETER       :: zero=0.0_iwp
 
-  INTEGER,INTENT(IN) 	    :: nn,nr
+  INTEGER,INTENT(IN) 	    :: nn,nr,nod
 
   INTEGER,INTENT(INOUT)     :: g_g_pp(ndim*nod,nels_pp),rest(nr,nodof+1)
   INTEGER,INTENT(INOUT)     :: g_num_pp(nod,nels_pp)
@@ -93,22 +94,37 @@
   REAL(iwp),INTENT(IN)      :: g_coord(ndim,nn)
   REAL(iwp),INTENT(INOUT)   :: g_coord_pp(nod,ndim,nels_pp)
 
+  REAL(iwp)                 :: volume,det
+  
   CHARACTER(LEN=50)         :: argv
   CHARACTER(LEN=15)         :: element
 
   LOGICAL                   :: initialised
- 
+
 !----------------------------------------------------------------------
-! 2. Input and Initialisation
+! 2. Declare dynamic arrays
+!----------------------------------------------------------------------
+  
+  REAL(iwp),ALLOCATABLE     :: points(:,:),dee(:,:),weights(:)
+  REAL(iwp),ALLOCATABLE     :: jac(:,:),der(:,:)
+!----------------------------------------------------------------------
+! 3. Input and Initialisation
 !---------------------------------------------------------------------- 
 
   ! Degrees of Freedon per Element
   ndof  =  nod*nodof
   ntot  =  ndof
-
+  
   ! Variables required for writing and partioning
-  argv="Case"; nlen=4; nip=8; element="hexahedron"; partitioner=1
-
+  argv="Case"; nlen=4; partitioner=1
+  
+  SELECT CASE(nod)
+    CASE(8)
+      nip=8; element="hexahedron"
+    CASE(4)
+      nip=4; element="tetrahedron"
+  END SELECT
+  
   ! Test for MPI Initialisation
   CALL MPI_INITIALIZED(initialised,ier) 
   
@@ -128,20 +144,62 @@
 
   ! nels_pp calculated in Foam-Extend
   ! Calculate iel_start
-  CALL setielstart() 
+  CALL setielstart()
+  
+!----------------------------------------------------------------------
+! 4. Allocate arrays to calculate volumes
+!----------------------------------------------------------------------
+
+  ALLOCATE(points(nip,ndim),jac(ndim,ndim),weights(nip),der(ndim,nod))
  
 !----------------------------------------------------------------------
-! 3. Populate g_num_pp
+! 5. Populate g_num_pp and g_coord_pp
 !----------------------------------------------------------------------
 
-  ! Convert from Foam-Extend to Smith Gritths format
-  DO iel=1,nels_pp
-    CALL of2sg(element,g_num_pp(:,iel),nod)
-  ENDDO
+  IF(nod .EQ. 8)THEN
+  
+    IF(numpe .EQ. 1) PRINT*,"Element type: ",element
+    
+    ! Convert from Foam-Extend to Smith Gritths format
+    DO iel=1,nels_pp
+      CALL of2sg(element,g_num_pp(:,iel),nod)
+    ENDDO
+    ! Populate the coordinate matrix
+    CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
+    
+  ELSE IF(nod .EQ. 4)THEN
+  
+     IF(numpe .EQ. 1) PRINT*,"Element type: ",element
+     
+    ! Populate the coordinate matrix
+    CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
+    
+    DO iel=1,nels_pp
+      ! Calculate Volume
+      volume  =  zero
+      CALL sample(element,points,weights)
+      DO i=1,nip  
+        CALL shape_der(der,points,i)
+        jac=MATMUL(der,g_coord_pp(:,:,iel))
+        det=determinant(jac)
+        volume=volume+det*weights(i)
+      END DO
 
-   
+      ! If volume is negative Reorientate and repopulate g_coord_pp
+      ! It could be useful to recalculate volume
+      ! as an error check
+      IF(volume .LE. 0.0)THEN
+        CALL of2sg(element,g_num_pp(:,iel),nod)
+        g_coord_pp=zero
+        CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)  
+      ENDIF
+    ENDDO
+  ELSE
+    IF(numpe .EQ. 1) PRINT*,"Element type not found"
+  END IF
+
 !----------------------------------------------------------------------
-! 4. Calculate g_g_pp
+! 6. Calculate g_g_pp
 !----------------------------------------------------------------------
 
   ! Rearrange the rest Array
@@ -180,12 +238,6 @@
 
   CALL make_ggl(npes_pp,npes,g_g_pp)
 
-!----------------------------------------------------------------------
-! 5. Populate g_coord_pp
-!----------------------------------------------------------------------
-
-  CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim) 
-
   ! output g_g_pp,g_num_pp,g_coord_pp
  
   END SUBROUTINE
@@ -194,7 +246,7 @@
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
 
-  SUBROUTINE runnl(node,val,num_var,mat_prop,nr,loaded_nodes,timeStep, 	&
+  SUBROUTINE runnl(node,val,num_var,mat_prop,nod,nr,loaded_nodes,timeStep, 	&
                       g_g_pp,g_num_pp,g_coord_pp,gravlo_pp,Dfield,Ufield,Afield)
   !/****f* parafemnl/runnl
   !*  NAME
@@ -257,10 +309,10 @@
 ! 1. Declare variables used in the main program
 !------------------------------------------------------------------------------
 
-  INTEGER,PARAMETER         :: nodof=3,ndim=3,nst=6,nod=8
+  INTEGER,PARAMETER         :: nodof=3,ndim=3,nst=6
   REAL(iwp),PARAMETER       :: zero=0.0_iwp,one=1.0_iwp
 
-  INTEGER,INTENT(IN)        :: loaded_nodes,nr
+  INTEGER,INTENT(IN)        :: loaded_nodes,nr,nod
 
   INTEGER,INTENT(INOUT)     :: g_g_pp(ntot,nels_pp)
   INTEGER,INTENT(INOUT)     :: g_num_pp(nod,nels_pp),node(loaded_nodes)
@@ -289,13 +341,12 @@
   REAL(iwp)                 :: dtim,beta,delta
 
   REAL(iwp)                 :: xi,eta,zeta,etam,xim,zetam,etap,xip,zetap
+  REAL(iwp),SAVE            :: time
 
   CHARACTER(len=15)         :: element
   CHARACTER(len=50)         :: text
   CHARACTER(len=50)         :: fname_base, fname
   CHARACTER(LEN=50)         :: argv
-
-  INTEGER :: argc, iargc
  
   LOGICAL :: converged, timewrite=.TRUE.
 
@@ -345,15 +396,17 @@
   ! Barrier (may not be needed but safe)
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
   
-  ! Set Base paramenter
-  argv       =  "Case"       ! Name files write to
-  nlen       =  4            ! Length of Name
-  nip        =  8            ! Number of Integration Points
-  element    =  "hexahedron" ! Element Name
+  ! Variables required for writing and partioning
+  argv="Case"; nlen=4; partitioner=1
+  
+  SELECT CASE(nod)
+    CASE(8)
+      nip = 8; element = "hexahedron"; dimH = 8
+    CASE(4)
+      nip = 4; element = "tetrahedron"; dimH = 4
+  END SELECT
 
   num_load_steps = 1         ! Number of load steps
-
-  dimH       = 8             ! dimH = dim
 
   printres   = 0             ! Write .res file
 
