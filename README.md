@@ -1,22 +1,27 @@
 # OpenFPCI
 
-Open source FOAM to ParaFEM Coupling Interface:
+OpenFPCI: Open source FOAM to ParaFEM Coupling Interface
 
 ## Motivation
 
-The package allows the coupling of a Finite Element Package ParaFEM to a Computational Fluid Dynamics package Foam-extend. The motivation is to provide a framework for which users can model Fluid Structure Interaction problems on High Performance Computing Systems.
+The package allows the coupling of the finite element package ParaFEM to a computational fluid dynamics package OpenFOAM-Extend. The motivation behind this coupling, is to provide a framework for which users can model fluid structure interaction problems using high performance computing services.
 
 ## Description
 
-This package requires Foam-Extend, ParaFEM and an external Fluid Structure Interaction library. These can be installed through the following websites.
+This package requires OpenFOAM-Extend, ParaFEM and an external fluid structure interaction library, which can be installed through the following websites.
 
 ParaFEM: https://sourceforge.net/projects/parafem/
 
-Foam-Extend: https://openfoamwiki.net/index.php/Installation/Linux/foam-extend-4.0
+OpenFOAM-Extend: https://openfoamwiki.net/index.php/Installation/Linux/foam-extend-4.0
 
 FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-structure\_interaction
 
-The library represents a direct coupling between ParaFEM and Foam-Extend, through C++ wrappers around fortran parafem subroutines.
+The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, through OpenFPCI plugins. The OpenFPCI plugings compromise a series of Fortran subroutines, that used ParaFEM's highly parallel implementation, and a C++ wrapper.
+
+## Summary 
+
+OpenFPCI consists of a number files, that are listed below with a brief description. 
+
 
 ## Installation
 
