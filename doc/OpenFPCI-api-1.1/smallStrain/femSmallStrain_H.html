@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html  xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="Content-type" content="text/html; charset=ISO-8859-1" />
+<link rel="stylesheet" href="../robodoc.css" type="text/css" />
+<title>./../src/solidSolvers/paraFEM/smallStrain/femSmallStrain.H</title>
+<!-- Source: ./../src/solidSolvers/paraFEM/smallStrain/femSmallStrain.H -->
+<!-- Generated with ROBODoc Version 4.99.38 (Jan 10 2018) -->
+</head>
+<body>
+<div id="logo">
+<a name="robo_top_of_doc">OpenFPCI API (Version 1.1)</a>
+</div> <!-- logo -->
+<div id="navigation">
+<a class="menuitem" href="../toc_index.html#top">Table of Contents</a>
+<a class="menuitem" href="../robo_sourcefiles.html#top">Sourcefiles</a>
+<a class="menuitem" href="../masterindex.html#top">Index</a>
+<a class="menuitem" href="../robo_classes.html#top">Classes</a>
+<a class="menuitem" href="../robo_functions.html#top">Functions</a>
+<a class="menuitem" href="../robo_modules.html#top">Modules</a>
+</div> <!-- navigation -->
+<div id="content">
+<hr />
+<a name="SolidSolver2ffemSmallStrain2eH"></a>
+<a name="robo23"></a><h2>SolidSolver/femSmallStrain.H [ Classes ]</h2>
+
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ <a href="../robo_classes.html#robo_top_of_doc">Classes</a> ]</p>
+<p class="item_name">FUNCTION</p>
+<pre>   femSmallStrain is a solid solver that is included in the
+   fluidStructureInteraction library. It acts as a wrapper between
+   the ParaFEM fortran subroutines and the Foam-Extend FSI library
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>   femSmallStrain is a class that inherits from solidSolver.
+   Important, methods to note are the constructor and evolve
+   functions.
+    
+   During the constructor of this class, <a href="../fem_routines/parafeml_f90.html#robo2">initl</a> and 
+   finddiagl are called, initialising ParaFEM and
+   calculating the preconditioner. Then each time step
+   femSmallStrain::evolve() calls <a href="../fem_routines/parafeml_f90.html#robo4">runl</a>, that solves the 
+   governing equations of the problem. These are the two
+   important subroutines from this class.
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>   S. Hewitt
+</pre>
+
+</div> <!-- content -->
+<div id="footer">
+<p>Generated from ./../src/solidSolvers/paraFEM/smallStrain/femSmallStrain.H with <a href="http://www.xs4all.nl/~rfsber/Robo/robodoc.html">ROBODoc</a> V4.99.38 on Fri Aug 24 2018 18:11:19
+</p>
+</div> <!-- footer -->
+</body>
+</html>

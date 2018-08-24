@@ -1,0 +1,757 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html  xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="Content-type" content="text/html; charset=ISO-8859-1" />
+<link rel="stylesheet" href="./OpenFPCI-api-1.1.css" type="text/css" />
+<title>./OpenFPCI-api-1.1</title>
+<!-- Source: ./../src/solidSolvers/paraFEM/ -->
+<!-- Generated with ROBODoc Version 4.99.38 (Jan 10 2018) -->
+</head>
+<body>
+<div id="logo">
+<a name="robo_top_of_doc">OpenFPCI API (Version 1.1)</a>
+</div> <!-- logo -->
+<a name="robo0"></a>
+<a name="solvers2fparafeml"></a>
+<h1>1.  solvers/parafeml [ Modules ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Modules ]</p>
+<p class="item_name">NAME</p>
+<pre>    <strong>parafeml</strong> - Routines to solve 3D linear elastic 
+               deformation using the small strain assumption.
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    The group of subroutines makes up the routines required to
+    solve the forced vibration of a 3D linear elastic solid
+    assuming the material undergoes finite strain. 
+
+    The governing equations solved:
+    
+    [M]{a}+[C]{u}+[K]{d} = {f_t}
+
+    The equations are stepped through using the linear interpolation
+    in time using theta.
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    These routines are based on the decomposition of program 12.9 
+    found in "Programming the Finite Element Method".
+    P12.9 is the parallel analysis of the forced vibration of a
+    linear elastic solid.
+    
+    Subroutine           Purpose    
+
+    <a href="#robo2">initl</a>                Generates initial matricies and arrays
+    <a href="#robo4">runl</a>                 Solves the governing equations
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S.Hewitt
+</pre>
+<p class="item_name">COPYRIGHT</p>
+<pre>    (c) University of Manchester 1996-2017
+</pre>
+<a name="robo1"></a>
+<a name="parafeml2ffinddiagprecon"></a>
+<h2>1.1.  parafeml/finddiagprecon [ Functions ]  </h2>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ <a href="#robo0">parafeml</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>finddiagprecon</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: <strong>finddiagprecon</strong>(store_km_pp_OF_,store_mm_pp_OF_,      &amp;
+                            numSchemes_,diag_precon_pp_OF_); 
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Calculates the diagonal preconditioner vector used 
+    in the PCG solution.
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    store_km_pp (ntot,ntot,nels_pp)  - Stiffness Matrix
+    store_mm_pp (ntot,ntot,nels_pp)  - Mass Matrix
+
+    numVar      (a1 b1 theta dTim)   - Numerical Variables
+    time_step                        - time step
+    sProp       (e,v,rho)            - Rheology Properties
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    diag_precon_pp (neq_pp)          - Diagonal Preconditioner
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo2"></a>
+<a name="parafeml2finitl"></a>
+<h2>1.2.  parafeml/initl [ Functions ]  </h2>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ <a href="#robo0">parafeml</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>initl</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:  initl_(mPoints_,rest_,&amp;gPoints_,&amp;numRestrNodes_,
+                   g_num_pp_OF_,g_g_pp_OF_,g_coord_pp_OF_);
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Initialises ParaFEM, this inculdes initialising the MPI
+    Passing mesh information from OpenFOAM into ParaFEM and  
+    creating the steering matrix (g_g_pp).
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    g_coord   (ndim,nn)             - Coordinates of the mesh
+    rest      (nr,nodof+1)          - Restrained Nodes, e.g.(# x y z)
+
+    nn                              - Number of Nodes
+    nr                              - Number of restrained Nodes 
+
+    g_num_pp  (nod,nels_pp)         - Distributed element steering array
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    g_g_pp      (ntot,nels_pp)      - Distributed equation steering array
+    g_coord_pp  (nod,ndim,nels_pp)  - Distributed nodal cooridnates 
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo3"></a>
+<a name="parafeml2finitnl"></a>
+<h2>1.3.  parafeml/initnl [ Functions ]  </h2>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ <a href="#robo0">parafeml</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>initnl</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:  initnl_(mPoints_,rest_,&amp;gPoints_,&amp;numRestrNodes_,
+                   g_num_pp_OF_,g_g_pp_OF_,g_coord_pp_OF_);
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Initialises ParaFEM, this inculdes initialising the MPI
+    Passing mesh information from OpenFOAM into ParaFEM and  
+    creating the steering matrix (g_g_pp).
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    g_coord   (ndim,nn)             - Coordinates of the mesh
+    rest      (nr,nodof+1)          - Restrained nodes, e.g.(# x y z)
+
+    nod                             - Number of nodes per element
+    nn                              - Number of nodes
+    nr                              - Number of restrained nodes 
+
+    g_num_pp  (nod,nels_pp)         - Distributed element steering array
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    g_g_pp      (ntot,nels_pp)      - Distributed equation steering array
+    g_coord_pp  (nod,ndim,nels_pp)  - Distributed nodal cooridnates 
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo4"></a>
+<a name="parafeml2frunl"></a>
+<h2>1.4.  parafeml/runl [ Functions ]  </h2>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ <a href="#robo0">parafeml</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>runl</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:     runl_(forceNodes_,fext_OF_,numSchemes_,solidProps_,
+                     &amp;numRestrNodes_,&amp;numFixedForceNodes_, &amp;dtim,
+                     g_g_pp_OF_,g_num_pp_OF_,g_coord_pp_OF_,gravlo_,
+                     ptDtemp_,ptUtemp_,ptAtemp_);
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Reads in the current timesteps displacement, velocity, 
+    acceleration and external force field. Loads the structure    
+    and solves the governing equations of the problem
+
+        {F} = [M]{a} + [C]{u} + [K]{d} 
+
+    The new displacement, velocity and acceleration fields are
+    output. Note this subroutine is used for problems with infinte strain.
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    val         (ndim,loaded_nodes)  - Force vector of loaded nodes
+    node        (loaded_nodes)       - Node # of loaded_nodes
+    num_var     (a1 b1 theta dTim)   - Numerical Variables
+    mat_prop    (e v rho)            - Material Properties
+
+    nr                               - Number of restrained nodes
+    loaded_nodes                     - Number of loaded nodes
+    time_step                        - time step
+
+    g_g_pp      (ntot,nels_pp)       - Distributed equation steering array
+    g_num_pp    (nod,nels_pp)        - Distributed element steering array
+    g_coord_pp  (nod,nels_pp)        - Distributed nodal coordinates
+    store_km_pp (ntot,ntot,nels_pp)  - Distributed stiffness matrix [k]
+    store_mm_pp (ntot,ntot,nels_pp)  - Distributed mass matrix [M]
+
+    diag_precon_pp (neq_pp)          - Distributed diagonal preconditioner
+    gravlo_pp      (neq_pp)          - Vector of gravity loads
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    Dfield  (ntot,nels_pp)           - Distributed nodal displacements
+    Ufield  (ntot,nels_pp)           - Distributed nodal velocities
+    Afield  (ntot,nels_pp)           - Distributed nodal accelerations
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo5"></a>
+<a name="parafemnl2frunnl"></a>
+<h1>2.  parafemnl/runnl [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>runnl</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:     runnl_(forceNodes_,fext_OF_,numSchemes_,solidProps_,
+                     &amp;numRestrNodes_,&amp;numFixedForceNodes_, &amp;dtim,
+                     g_g_pp_OF_,g_num_pp_OF_,g_coord_pp_OF_,gravlo_,
+                     ptDtemp_,ptUtemp_,ptAtemp_);
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Reads in the current timesteps displacement, velocity, 
+    acceleration and external force field. Loads the structure    
+    and solves the governing equations of the problem
+
+        {R} = {Fint} - {Fext} + [M]{a} + [K]{d}
+
+    The new displacement, velocity and acceleration fields are
+    output. This subroutine is used for problems with finite strain
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    val         (ndim,loaded_nodes)  - Force vector of loaded nodes
+    node        (loaded_nodes)       - Node # of loaded_nodes
+    num_var     (a1 b1 theta dTim)   - Numerical Variables
+    mat_prop    (e v rho)            - Material Properties
+
+    nr                               - Number of restrained nodes
+    loaded_nodes                     - Number of loaded nodes
+    time_step                        - time step
+
+    g_g_pp      (ntot,nels_pp)       - Distributed equation steering array
+    g_num_pp    (nod,nels_pp)        - Distributed element steering array
+    g_coord_pp  (nod,nels_pp)        - Distributed nodal coordinates
+    store_km_pp (ntot,ntot,nels_pp)  - Distributed stiffness matrix [k]
+    store_mm_pp (ntot,ntot,nels_pp)  - Distributed mass matrix [M]
+
+    diag_precon_pp (neq_pp)          - Distributed diagonal preconditioner
+    gravlo_pp      (neq_pp)          - Vector of gravity loads
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    Dfield  (ntot,nels_pp)           - Distributed nodal displacements
+    Ufield  (ntot,nels_pp)           - Distributed nodal velocities
+    Afield  (ntot,nels_pp)           - Distributed nodal accelerations
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo6"></a>
+<a name="parafemnl2fwrite5flargestrain"></a>
+<h1>3.  parafemnl/write_largestrain [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>write_largestrain</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:      CALL <strong>write_largestrain</strong>(timest)
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Master processor writes out brief details about the problem and 
+    some performance data
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    The following dynamic real array has the INTENT(IN) attribute:
+
+    timest(:)              : Holds timing information
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    Sam Hewitt
+</pre>
+<p class="item_name">CREATION DATE</p>
+<pre>    21.03.2018
+</pre>
+<a name="robo7"></a>
+<a name="parafemnl2fwrite5fsmallstrain"></a>
+<h1>4.  parafemnl/write_smallstrain [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>write_smallstrain</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:      CALL <strong>write_smallstrain</strong>(timest)
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Master processor writes out brief details about the problem and 
+    some performance data
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    The following dynamic real array has the INTENT(IN) attribute:
+
+    timest(:)              : Holds timing information
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    Sam Hewitt
+</pre>
+<p class="item_name">CREATION DATE</p>
+<pre>    21.03.2018
+</pre>
+<a name="robo8"></a>
+<a name="parafemutils2fcalcnelsppof"></a>
+<h1>5.  parafemutils/calcnelsppof [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    <strong>calcnelsppof</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Unused in current version
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function is used to calculate the number 
+    of elements per processor, it is a very primitive 
+    form of mesh decomposition assigning elements to
+    processors in order
+</pre>
+<p class="item_name">WARNINGS</p>
+<pre>    This is a deprecated routine
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo9"></a>
+<a name="parafemutils2fcheckforce"></a>
+<h1>6.  parafemutils/checkforce [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>checkforce</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: checkforce_(force,sense,node_ensi,&amp;solidPatchIDSize,&amp;
+                               paraFemSolidDisp,&amp;numPoints);                                 
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Prints the forces to file in ENSI GOLD format  
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    force  (loaded_nodes*ndim)  - Mesh coordinates 
+    sense  (loaded_nodes*ndim)  - Vector to define x,y,z 
+    node   (loaded_nodes*ndim)  - Node Numbers of loaded nodes
+    solidPatchIDSize            - Size of boundary Mesh     
+    nn                          - # of Nodes                        
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>      Writes to file "argv".ensi.NDLDS
+      Contains information about loads on nodes
+                    
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+    L. Margetts
+</pre>
+<a name="robo10"></a>
+<a name="parafemutils2fcheckparafem"></a>
+<h1>7.  parafemutils/checkparafem [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>checkparafem</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: checkparafem_(MeshData,g_num_OF,rest_ensi,       &amp;
+                    &amp;numPoints,&amp;numCells);
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Writes the mesh to file in ensi gold format 
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    g_coord   (ndim,nn)    - Mesh coordinates               
+    g_num     (nod,nels)   - Steering Matrix (x-y-z)                                
+    rest_ensi (nodof+1,nr) - Restrained Nodes
+    nn                     - # of Nodes 
+    els=nels               - # of Elements/Cells
+                    
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    Writes to file "argv".ensi.case and oter. "argv".ensi.xxx files
+    Contains information about Mesh, Material, Geometry and Restraints
+
+    File    Description 
+
+    MATID   Material ID's
+    NDLDS   Loaded Nodes
+    NDBND   Restrained Nodes 
+    geo     Geometery File
+    case    Case file
+</pre>
+<p class="item_name">WARNINGS</p>
+<pre>    It currently only works in serial.
+</pre>
+<p class="item_name">TODO</p>
+<pre>    * Clean and update
+    * Write to work in parallel
+                    
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo11"></a>
+<a name="parafemutils2ffindnelspp"></a>
+<h1>8.  parafemutils/findnelspp [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    <strong>findnelspp</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Unused in current version
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function acts an access fuction for the
+    Foam-Extend code, it returns the value of 
+    nels_pp, the number of elements per processor 
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo12"></a>
+<a name="parafemutils2ffindneqpp"></a>
+<h1>9.  parafemutils/findneqpp [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    <a href="#robo19">setnelspp</a>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: const int neq_pp_OF = findneqpp_();
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function is used to return the neq_pp, the
+    number of equations per processor to Foam-Extend
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo13"></a>
+<a name="parafemutils2fgloads"></a>
+<h1>10.  parafemutils/gloads [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>gloads</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: gloads_(gravlo_,&amp;specWeight,&amp;gPoints_,&amp;nodof,&amp;nod,&amp;ndim,
+                   &amp;numRestrNodes_, mPoints_,g_num_pp_OF_,rest_);     
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Supplies a gravitational force vector   
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    specWeight   - Specific Weight (density  * gravitaional loading)
+    nn           - Total number of nodes in mesh
+    nodof        - Number of degrees of freedom per node
+    nod          - Number of Nodes per Element
+    ndim         - Number of dimensions             
+    nr           - Number of restrained nodes       
+
+    g_num_pp (nod,nels_pp)  - Element Steering matrix
+    g_coord  (ndim,nn)      - Global Coordinate matrix
+    rest     (nr,nodof+1)   - Matrix of restrained nodes
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    gravlo_pp   (neq_pp)     - Vector of loads
+            
+</pre>
+<p class="item_name">WARNINGS</p>
+<pre>    * Default direction is negative Y
+    * REST must be rearranged before function call  
+</pre>
+<p class="item_name">TODO</p>
+<pre>    * Remove need for global coordinate matrix
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo14"></a>
+<a name="parafemutils2fof2sg"></a>
+<h1>11.  parafemutils/of2sg [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>of2sg</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage:      <strong>of2sg</strong>(element,g_num_pp(:,iel)) 
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    It rearranges the steering matrix from Foam-Extend format
+    to Smith-Griffiths format
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    element - Element Type  
+    nod     - Number of nodes per element
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    vector  - New element node orders
+</pre>
+<p class="item_name">TODO</p>
+<pre>    * Include tetrahedral elements
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo15"></a>
+<a name="parafemutils2fpopulate5fg5fcoord5fpp"></a>
+<h1>12.  parafemutils/populate_g_coord_pp [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>populate_g_coord_pp</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>populate_g_coord_pp</strong>(g_coord,g_coord_pp,g_num_pp,    &amp;
+                                         npes,nn,nod,ndim)
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Populates g_coord_pp based on g_coord. It takes the global
+    list of coordinates and reduces them to the local coordinate 
+    lists based on the steering matrix g_num_pp.
+    It is used when the decomposition is done using ParaFEMs
+    methods
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    g_coord  (ndim,nn)  - Mesh coordinates  
+    g_num_pp (nod,nels) - Steering Matrix   
+    
+    npes                - Number of processes
+    nn                  - Number of nodes 
+    nod                 - Number of nodes per element
+    ndim                - Number of dimensions per node               
+                    
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>      g_coord_pp (nod,ndim,nels_pp) - Coordinate matrix
+</pre>
+<p class="item_name">WARNINGS</p>
+<pre>    This version has been outdated by <a href="#robo16">populate_g_coord_pp2</a>.
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    Sam Hewitt
+</pre>
+<p class="item_name">CREATION DATE</p>
+<pre>    28th September 2016
+</pre>
+<p class="item_name">COPYRIGHT</p>
+<pre>    (c) University of Manchester 2007-2016
+</pre>
+<a name="robo16"></a>
+<a name="parafemutils2fpopulate5fg5fcoord5fpp2"></a>
+<h1>13.  parafemutils/populate_g_coord_pp2 [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>populate_g_coord_pp2</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>populate_g_coord_pp2</strong>(g_coord,g_coord_pp,g_num_pp,   &amp;
+                                         nod,ndim)
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    Populates g_coord_pp based on g_coord. It takes the global
+    list of coordinates and reduces them to the local coordinate 
+    lists based on the steering matrix g_num_pp.
+    It is used when decomposition has been done by Foam-Extend
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    g_coord  (ndim,nn)  - Mesh coordinates          
+    g_num_pp (nod,nels) - Steering Matrix           
+    nn                  - Number of nodes 
+    nod                 - Number of nodes per element
+    ndim                - Number of dimensions per node             
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>      g_coord_pp (nod,ndim,nels_pp) - Coordinate matrix
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    Sam Hewitt
+</pre>
+<p class="item_name">CREATION DATE</p>
+<pre>    6th May 2017
+</pre>
+<p class="item_name">COPYRIGHT</p>
+<pre>    (c) University of Manchester 2007-2016
+</pre>
+<a name="robo17"></a>
+<a name="parafemutils2fpopulate5fg5fnum5fpp"></a>
+<h1>14.  parafemutils/populate_g_num_pp [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>populate_g_num_pp</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>populate_g_num_pp</strong>(g_num,g_num_pp,npes,nod,nels)
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This subroutine was used in early versions of the code to
+    distribute a global steering matrix to a local one
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    g_num  (nod,nels)      - Global steering matrix         
+    g_num_pp (nod,nels_pp) - Local Steering Matrix          
+    npes                   - Number of Processors 
+    nod                    - Number of nodes per element
+    nels                   - Total Number elements  
+</pre>
+<p class="item_name">WARNINGS</p>
+<pre>    This subroutine is currently not used it was relevant in
+    a previous version.
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    Sam Hewitt
+</pre>
+<p class="item_name">CREATION DATE</p>
+<pre>    28th September 2016
+</pre>
+<p class="item_name">COPYRIGHT</p>
+<pre>    (c) University of Manchester 2007-2016
+</pre>
+<a name="robo18"></a>
+<a name="parafemutils2fsetielstart"></a>
+<h1>15.  parafemutils/setielstart [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    <strong>setielstart</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>setielstart</strong>()
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function is used by initparafem to set
+    the starting element number on each processor 
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo19"></a>
+<a name="parafemutils2fsetnelspp"></a>
+<h1>16.  parafemutils/setnelspp [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    <strong>setnelspp</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: setnelspp_(&amp;nels_pp_OF);
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function is used to set an input variable
+    to the number of elements per processor, nels_pp
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    nCells  - Number of Cells
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo20"></a>
+<a name="parafemutils2fsystem5fmem5fusage"></a>
+<h1>17.  parafemutils/system_mem_usage [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>system_mem_usage</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>system_mem_usage</strong>(ValueA,ValueB)    
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function reads the /proc/procnum file of the
+    current process and outputs the RSS and VM memory
+    values, copying them into the inputs
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    valueRSS   - RSS Memory (Resident Set Size)
+    valueVM    - VM Memory  (Virtual Memory)        
+</pre>
+<p class="item_name">WARNINGS</p>
+<pre>    If you are using a intel compiler, you must include 
+    the ifport module
+</pre>
+<p class="item_name">NOTES</p>
+<pre>    https://stackoverflow.com/questions/22028571/track-memory-usage-in-fortran-90
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo21"></a>
+<a name="parafemutils2fwriteToFile"></a>
+<h1>18.  parafemutils/writeToFile [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>writeToFile</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>writeToFile</strong>(10,"g_num_pp.txt",g_num_pp,nod*nels_pp)    
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function writes a float field to file. Its main purpose
+     is debugging and is not currrently called in the code.  
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    filenum   - File Number, any positive Integer
+    filename  - Name of output file
+    field     - Field to loop through
+    dim1      - Dimensions of the field
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    File of the name "filename" with the field written out          
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo22"></a>
+<a name="parafemutils2fwriteToFileInt"></a>
+<h1>19.  parafemutils/writeToFileInt [ Functions ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Functions ]</p>
+<p class="item_name">NAME</p>
+<pre>    SUBROUTINE: <strong>writeToFileInt</strong>
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>    Usage: CALL <strong>writeToFileInt</strong>(10,"g_num_pp.txt",g_num_pp,nod*nels_pp)    
+</pre>
+<p class="item_name">FUNCTION</p>
+<pre>    This function writes an Integer field to file. Its main purpose
+     is debugging and is not currrently called in the code.  
+</pre>
+<p class="item_name">INPUTS</p>
+<pre>    filenum   - File Number, any positive Integer
+    filename  - Name of output file
+    field     - Field to loop through
+    dim1      - Dimensions of the field
+</pre>
+<p class="item_name">OUTPUT</p>
+<pre>    File of the name "filename" with the field written out          
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>    S. Hewitt
+</pre>
+<a name="robo23"></a>
+<a name="SolidSolver2ffemSmallStrain2eH"></a>
+<h1>20.  SolidSolver/femSmallStrain.H [ Classes ]  </h1>
+<p>[ <a href="#robo_top_of_doc">Top</a> ] [ Classes ]</p>
+<p class="item_name">FUNCTION</p>
+<pre>   femSmallStrain is a solid solver that is included in the
+   fluidStructureInteraction library. It acts as a wrapper between
+   the ParaFEM fortran subroutines and the Foam-Extend FSI library
+</pre>
+<p class="item_name">SYNOPSIS</p>
+<pre>   femSmallStrain is a class that inherits from solidSolver.
+   Important, methods to note are the constructor and evolve
+   functions.
+    
+   During the constructor of this class, <a href="#robo2">initl</a> and 
+   finddiagl are called, initialising ParaFEM and
+   calculating the preconditioner. Then each time step
+   femSmallStrain::evolve() calls <a href="#robo4">runl</a>, that solves the 
+   governing equations of the problem. These are the two
+   important subroutines from this class.
+</pre>
+<p class="item_name">AUTHOR</p>
+<pre>   S. Hewitt
+</pre>
+<div id="footer">
+<p>Generated from ./../src/solidSolvers/paraFEM/ with <a href="http://www.xs4all.nl/~rfsber/Robo/robodoc.html">ROBODoc</a> V4.99.38 on Fri Aug 24 2018 18:05:58
+</p>
+</div> <!-- footer -->
+</body>
+</html>
