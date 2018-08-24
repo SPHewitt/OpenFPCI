@@ -23,6 +23,8 @@ The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, th
    * [createDocs](./doc/createDocs)
    * [OpenFPCI-api-1.0.css](./doc/OpenFPCI-api-1.0.css)
    * [OpenFPCI-api-1.0.html](./doc/OpenFPCI-api-1.0.html)
+   * [OpenFPCI-api-1.1.css](./doc/OpenFPCI-api-1.1.css)
+   * [OpenFPCI-api-1.1.html](./doc/OpenFPCI-api-1.1.html)
    * [robodoc.rc](./doc/robodoc.rc)
  * [README.md](./README.md)
  * [run](./run)
