@@ -56,6 +56,17 @@ The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, th
          * [femSmallStrain.H](./src/solidSolvers/paraFEM/smallStrain/femSmallStrain.H)
          * [femSmallStrainSolve.C](./src/solidSolvers/paraFEM/smallStrain/femSmallStrainSolve.C)
          * [updateForce.H](./src/solidSolvers/paraFEM/smallStrain/updateForce.H)
+         
+The directories of importance are higlighted below with a brief description.
+
+| Directory     | Purpose       |
+| ------------- | ------------- |
+| [openfpci.sh](./src/openfpci.sh)  | This is the installation script, that can be run to install OpenFPCI |
+| [fem_routines](./src/solidSolvers/paraFEM/fem_routines)  | Contains the Fortran files that are used to solve specific engineering problems. The suffix `parafem` is followed by the files purpose. `parafeml.f90` is used to solve the deformation of a linear elastic material undergoing small strain. `parafemnl.90` is used to solve the deformation of a linear elastic material undergoing large strain and `parafemutil.f90` contains useful subroutines for debugging, I/O and adding external loads |
+| [largeStrain](./src/solidSolvers/paraFEM/largeStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafemnl.f90` Fortran file. |
+| [smallStrain](./src/solidSolvers/paraFEM/smallStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafeml.f90` Fortran file. |
+| [HronTurek](./run/HronTurek)  | This is the example test case. It is based of the Turek and Hron benchmark test case. |
+
 
 ## Installation
 
