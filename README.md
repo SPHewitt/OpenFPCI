@@ -19,13 +19,13 @@ FSI Library: https://openfoamwiki.net/index.php/Extend-bazaar/Toolkits/Fluid-str
 The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, through OpenFPCI plugins. The OpenFPCI plugings compromise a series of Fortran subroutines, that used ParaFEM's highly parallel implementation, and a C++ wrapper.
 
 ## Project tree
+The project tree presents the directories within OpenFPCI. Only the src/solidSolvers/paraFEM directory has been expanded, as these are the important files required to install and run OpenFPCI. The table below then provides a brief description of each of the directories in the project tree, in particular those within [src/solidSolvers/paraFEM](./src/solidSolvers/paraFEM)
+
  * [doc](./doc)
  * [README.md](./README.md)
  * [run](./run)
  * [src](./src)
    * [fluidSolvers](./src/fluidSolvers)
-     * [pimpleFluid](./src/fluidSolvers/pimpleFluid)
-     * [pisoChannelFluid](./src/fluidSolvers/pisoChannelFluid)
    * [openfpci.sh](./src/openfpci.sh)
    * [solidSolvers](./src/solidSolvers)
      * [paraFEM](./src/solidSolvers/paraFEM)
@@ -43,21 +43,17 @@ The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, th
          * [femSmallStrain.H](./src/solidSolvers/paraFEM/smallStrain/femSmallStrain.H)
          * [femSmallStrainSolve.C](./src/solidSolvers/paraFEM/smallStrain/femSmallStrainSolve.C)
          * [updateForce.H](./src/solidSolvers/paraFEM/smallStrain/updateForce.H)
-         
-The directories of importance are higlighted below with a brief description of the important files required for OpenFPCI.
-
+        
 | Directory     | Purpose       |
 | ------------- | ------------- |
 | [doc](./doc)  | Contains the documentation for current a previous version of OpenFPCI, created using robodoc. |
 | [run](./run)  | Contains example test cases including run and clean scripts. |
-| run/[HronTurek](./run/HronTurek)  | This is the example test case, based of the Turek and Hron benchmark test case. |
+| [run/HronTurek](./run/HronTurek)  | This is the example test case, based of the Turek and Hron benchmark test case. |
 | [src](./src)  | Contains the source code of OpenFPCI, it includes the files required for OpenFPCI along with additional fluidSolver implementations for the FSI library. |
-| src/[openfpci.sh](./src/openfpci.sh)  | This is the installation script, that can be run to install OpenFPCI |
-| src/solidSolvers/[fem_routines](./src/solidSolvers/paraFEM/fem_routines)  | Contains the Fortran files that are used to solve specific engineering problems. The suffix `parafem` is followed by the files purpose. `parafeml.f90` is used to solve the deformation of a linear elastic material undergoing small strain. `parafemnl.90` is used to solve the deformation of a linear elastic material undergoing large strain and `parafemutil.f90` contains useful subroutines for debugging, I/O and adding external loads |
-| src/solidSolvers/[largeStrain](./src/solidSolvers/paraFEM/largeStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafemnl.f90` Fortran file. |
-| src/solidSolvers/[smallStrain](./src/solidSolvers/paraFEM/smallStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafeml.f90` Fortran file. |
-
-
+| [src/openfpci.sh](./src/openfpci.sh)  | This is the installation script, that can be run to install OpenFPCI |
+| [src/solidSolvers/fem_routines](./src/solidSolvers/paraFEM/fem_routines)  | Contains the Fortran files that are used to solve specific engineering problems. The suffix `parafem` is followed by the files purpose. `parafeml.f90` is used to solve the deformation of a linear elastic material undergoing small strain. `parafemnl.90` is used to solve the deformation of a linear elastic material undergoing large strain and `parafemutil.f90` contains useful subroutines for debugging, I/O and adding external loads |
+| [src/solidSolvers/largeStrain](./src/solidSolvers/paraFEM/largeStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafemnl.f90` Fortran file. |
+| [src/solidSolvers/smallStrain](./src/solidSolvers/paraFEM/smallStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafeml.f90` Fortran file. |
 
 ## Installation
 
