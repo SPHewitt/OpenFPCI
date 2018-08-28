@@ -20,21 +20,8 @@ The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, th
 
 ## Project tree
  * [doc](./doc)
-   * [createDocs](./doc/createDocs)
-   * [OpenFPCI-api-1.0.css](./doc/OpenFPCI-api-1.0.css)
-   * [OpenFPCI-api-1.0.html](./doc/OpenFPCI-api-1.0.html)
-   * [OpenFPCI-api-1.1.css](./doc/OpenFPCI-api-1.1.css)
-   * [OpenFPCI-api-1.1.html](./doc/OpenFPCI-api-1.1.html)
-   * [robodoc.rc](./doc/robodoc.rc)
  * [README.md](./README.md)
  * [run](./run)
-   * [Allclean](./run/Allclean)
-   * [Allrun](./run/Allrun)
-   * [CFD3](./run/CFD3)
-   * [CSM3](./run/CSM3)
-   * [FSI3](./run/FSI3)
-   * [HronTurek](./run/HronTurek)
-   * [readme.txt](./run/readme.txt)
  * [src](./src)
    * [fluidSolvers](./src/fluidSolvers)
      * [pimpleFluid](./src/fluidSolvers/pimpleFluid)
@@ -57,15 +44,19 @@ The library represents a direct coupling between ParaFEM and OpenFOAM-Extend, th
          * [femSmallStrainSolve.C](./src/solidSolvers/paraFEM/smallStrain/femSmallStrainSolve.C)
          * [updateForce.H](./src/solidSolvers/paraFEM/smallStrain/updateForce.H)
          
-The directories of importance are higlighted below with a brief description.
+The directories of importance are higlighted below with a brief description of the important files required for OpenFPCI.
 
 | Directory     | Purpose       |
 | ------------- | ------------- |
-| [openfpci.sh](./src/openfpci.sh)  | This is the installation script, that can be run to install OpenFPCI |
-| [fem_routines](./src/solidSolvers/paraFEM/fem_routines)  | Contains the Fortran files that are used to solve specific engineering problems. The suffix `parafem` is followed by the files purpose. `parafeml.f90` is used to solve the deformation of a linear elastic material undergoing small strain. `parafemnl.90` is used to solve the deformation of a linear elastic material undergoing large strain and `parafemutil.f90` contains useful subroutines for debugging, I/O and adding external loads |
-| [largeStrain](./src/solidSolvers/paraFEM/largeStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafemnl.f90` Fortran file. |
-| [smallStrain](./src/solidSolvers/paraFEM/smallStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafeml.f90` Fortran file. |
-| [HronTurek](./run/HronTurek)  | This is the example test case. It is based of the Turek and Hron benchmark test case. |
+| [doc](./doc)  | Contains the documentation for current a previous version of OpenFPCI, created using robodoc. |
+| [run](./run)  | Contains example test cases including run and clean scripts. |
+| run/[HronTurek](./run/HronTurek)  | This is the example test case, based of the Turek and Hron benchmark test case. |
+| [src](./src)  | Contains the source code of OpenFPCI, it includes the files required for OpenFPCI along with additional fluidSolver implementations for the FSI library. |
+| src/[openfpci.sh](./src/openfpci.sh)  | This is the installation script, that can be run to install OpenFPCI |
+| src/solidSolvers/[fem_routines](./src/solidSolvers/paraFEM/fem_routines)  | Contains the Fortran files that are used to solve specific engineering problems. The suffix `parafem` is followed by the files purpose. `parafeml.f90` is used to solve the deformation of a linear elastic material undergoing small strain. `parafemnl.90` is used to solve the deformation of a linear elastic material undergoing large strain and `parafemutil.f90` contains useful subroutines for debugging, I/O and adding external loads |
+| src/solidSolvers/[largeStrain](./src/solidSolvers/paraFEM/largeStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafemnl.f90` Fortran file. |
+| src/solidSolvers/[smallStrain](./src/solidSolvers/paraFEM/smallStrain)  | Contains the C++ class files (.H and .C) that act a a wrapper around the `parafeml.f90` Fortran file. |
+
 
 
 ## Installation
