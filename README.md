@@ -66,7 +66,7 @@ The third-party FSI library and OpenFPCI can be downloaded and compiled using th
 
 ```
 echo "export PARAFEM_DIR=path/to/parafem-code/parafem" >> ~/.bashrc
-echo "export FOAM_DIR=path/to/foam/foam-extend.x.x" >> ~/.bashrc
+echo "export FOAM_DIR=path/to/foam/foam-extend-x.x" >> ~/.bashrc
 . ~/.bashrc
 cd OpenFPCI/src
 ./openfpci.sh
