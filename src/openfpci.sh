@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 
-#? OpenFPCI 1.1.0
-#? Copyright (C) 2018 Sam Hewitt
-#? License MIT
-#? This is free software: you are free to change and redistribute it.
-#? There is NO WARRANTY, to the extent permitted by law.
+# OpenFPCI 1.1.0
+# Author: Sam Hewitt
 
 # Description of what the script is doing
 #
