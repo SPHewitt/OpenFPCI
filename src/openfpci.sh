@@ -120,9 +120,10 @@ printf "FOAM_DIR="$FOAM_DIR"\n"
 printf "\nChecking Foam-Extend home directory:\n" >> $logfile
 printf "FOAM_DIR="$FOAM_DIR"\n"                   >> $logfile
 
-# TO DO:
-# Place a check to ensure Foam-Extend has been installed
-
+if [ ! -d "$FOAM_DIR" ]; then
+  printf "Foam-Extend directory not found, please check defintion of 'FOAM_DIR'"
+  exit 1
+fi
 
 ############################################################
 # Compilation and Installation of OpenFPCI requirement (FSI)
