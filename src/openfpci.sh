@@ -249,15 +249,15 @@ else
     STRING=$(printf "%*s%s" 3 '' "$STRING")
     sed -i "/EXE_LIBS = /a \ ${STRING}\\" $OPTIONS
     
-    STRING="${OPENFPCI_DIR}src/solidSolvers/paraFEM/fem_routines/objectFiles/parafemnl.o \\"
+    STRING="${OPENFPCI_DIR}/src/solidSolvers/paraFEM/fem_routines/objectFiles/parafemnl.o \\"
     STRING=$(printf "%*s%s" 3 '' "$STRING")
     sed -i "/EXE_LIBS = /a \ ${STRING}\\" $OPTIONS
     
-    STRING="${OPENFPCI_DIR}src/solidSolvers/paraFEM/fem_routines/objectFiles/parafeml.o \\"
+    STRING="${OPENFPCI_DIR}/src/solidSolvers/paraFEM/fem_routines/objectFiles/parafeml.o \\"
     STRING=$(printf "%*s%s" 3 '' "$STRING")
     sed -i "/EXE_LIBS = /a \ ${STRING}\\" $OPTIONS
     
-    STRING="${OPENFPCI_DIR}src/solidSolvers/paraFEM/fem_routines/objectFiles/parafemutils.o \\"
+    STRING="${OPENFPCI_DIR}/src/solidSolvers/paraFEM/fem_routines/objectFiles/parafemutils.o \\"
     STRING=$(printf "%*s%s" 3 '' "$STRING")
     sed -i "/EXE_LIBS = /a \ ${STRING}\\" $OPTIONS
     
