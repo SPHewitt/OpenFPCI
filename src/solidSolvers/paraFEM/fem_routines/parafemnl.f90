@@ -263,7 +263,7 @@
   !*    acceleration and external force field. Loads the structure    
   !*    and solves the governing equations of the problem
   !*
-  !*        {R} = {Fint} - {Fext} + [M]{a} + [K]{d}
+  !*        {R} = {Fint} - {Fext} + [M]{a} + [K]{d} + [C]{u}
   !*
   !*    The new displacement, velocity and acceleration fields are
   !*    output. This subroutine is used for problems with finite strain
@@ -328,13 +328,13 @@
   INTEGER                   :: nodes_pp, node_start
   INTEGER                   :: node_end, idx1, idx2
 
-  REAL(iwp),INTENT(IN)      :: num_var(5),mat_prop(3),timeStep,g_coord_pp(nod,ndim,nels_pp)
+  REAL(iwp),INTENT(IN)      :: num_var(7),mat_prop(3),timeStep,g_coord_pp(nod,ndim,nels_pp)
 
   REAL(iwp),INTENT(INOUT)   :: gravlo_pp(neq_pp)
   REAL(iwp),INTENT(INOUT)   :: Dfield(ntot,nels_pp),Ufield(ntot,nels_pp)
   REAL(iwp),INTENT(INOUT)   :: Afield(ntot,nels_pp), val(ndim,loaded_nodes)
 
-  REAL(iwp)                 :: up
+  REAL(iwp)                 :: up,ray_a,ray_b
   REAL(iwp)                 :: e,v,rho,det,tol, maxdiff, tol2, detF
   REAL(iwp)                 :: energy, energy1, rn0
   REAL(iwp)                 :: a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10
@@ -372,7 +372,7 @@
   REAL(iwp),SAVE,ALLOCATABLE  :: fext_pp(:), deltax_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: x1_pp(:),d1x1_pp(:),d2x1_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: x0_pp(:),d1x0_pp(:),d2x0_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: vu_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: vu_pp(:),xu_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: pmul_pp(:,:),utemp_pp(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: temp_pp(:,:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: vel_pp(:),acel_pp(:),eld_pp(:,:)
@@ -380,7 +380,7 @@
 
   REAL(iwp),SAVE,ALLOCATABLE  :: fun(:),emm(:,:),ecm(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: d2x1_ppstar(:),meff_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:),ceff_pp(:)
 
  
   INTEGER,SAVE,ALLOCATABLE  :: num(:),nr_iters(:,:)         
@@ -413,9 +413,11 @@
   ! Set Numerical and Material Values 
   beta   =  num_var(1)    ! Beta  (Typically = 0.25)
   delta  =  num_var(2)    ! Delta (Typically = 0.5)
-  tol    =  num_var(3)    ! Tolerance of PCG loop
-  limit  =  num_var(4)    ! Max number of Interation in PCG
-  tol2   =  num_var(5)    ! Tolerance for Newton-Raphson loop
+  ray_a  =  num_var(3)    ! Damping parameter A
+  ray_b  =  num_var(4)    ! Damping parameter B
+  tol    =  num_var(5)    ! Tolerance of PCG loop
+  limit  =  num_var(6)    ! Max number of Interation in PCG
+  tol2   =  num_var(7)    ! Tolerance for Newton-Raphson loop
 
   dtim    =  timeStep
 
@@ -449,7 +451,9 @@
     ALLOCATE(d2x1_pp(0:neq_pp))
 
     ALLOCATE(vu_pp(0:neq_pp))
+    ALLOCATE(xu_pp(0:neq_pp))
     ALLOCATE(meff_pp(0:neq_pp))
+    ALLOCATE(ceff_pp(0:neq_pp))
 
     ! Matricies
     ALLOCATE(temp_pp(ntot,ntot,nels_pp))
@@ -478,8 +482,8 @@
   d1x1_pp  =  0._iwp;    d2x1_pp =  0._iwp;
   x1_pp    =  0._iwp;
 
-  vu_pp    =  0._iwp;   
-
+  vu_pp    =  0._iwp;    xu_pp   =  0_iwp; 
+  
   nr_timest = zero; 
 
       
@@ -709,18 +713,13 @@
     ! Pages 511-513
 
      a0  = 1.0/(beta*(dtim**2.0))
-     a1  = zero  ! delta/(beta*dtim)
+     a1  = delta/(beta*dtim)
      a2  = 1.0/(beta*dtim)
      a3  = (1.0/( 2.0*beta)) -1.0
-     a4  = zero ! (delta/beta) - 1.0
-     a5  = zero ! (delta/2)*((delta/beta)-2.0)
-
-    ! Diverges from book due to exclusion of damping
-     a6  = 1.0/(beta*(dtim**2.0))
-     a7  = -1.0/(beta*dtim)
-     a8  = -( (1.0/(2.0*beta) ) -1.0)
-     a9  = dtim*(1-delta)
-     a10 = delta*dtim
+     a4  = (delta/beta) - 1.0
+     a5  = (dtim/2)*((delta/beta)-2.0)
+     a6  = dtim*(1-delta)
+     a7  = delta*dtim
 
      ! M_eff
      meff_pp = zero
@@ -741,13 +740,33 @@
 
      vu_pp = zero
      CALL SCATTER(vu_pp(1:),utemp_pp)
+     
+      !C_eff
+     ceff_pp = zero
+     ceff_pp(1:) = a1*(x0_pp(1:)-xnew_pp(1:)) + a4*d1x0_pp(1:) + a5*d2x0_pp(1:)
+     
+     temp_pp    =  zero
+     temp_pp = ray_a*storemm_pp+ray_b*storekm_pp
+     
+     pmul_pp = zero
+     
+     ! C*C_eff
+     CALL GATHER(ceff_pp(1:),pmul_pp) ; utemp_pp=zero
+     
+     DO iel=1,nels_pp
+       CALL DGEMV('N',ntot,ntot,one,temp_pp(:,:,iel),ntot,                 &
+                pmul_pp(:,iel),1,zero,utemp_pp(:,iel),1)
+     END DO
+     
+     xu_pp = zero
+     CALL SCATTER(xu_pp(1:),utemp_pp)
 
 !-------------------------------------------------------------------------
 ! 10. Get residual
 !-------------------------------------------------------------------------
 
      ! {r_pp}
-     r_pp(1:) = fext_pp(1:) - fint_pp(1:) + vu_pp(1:)
+     r_pp(1:) = fext_pp(1:) - fint_pp(1:) + vu_pp(1:) + xu_pp(1:)
 
      ! Compute maxdiff of residual 
      maxdiff =  MAXABSVAL_P(r_pp(1:))
@@ -847,11 +866,9 @@
  
    x1_pp(1:)       = xnew_pp(1:)
 
-   d2x1_ppstar(1:) = a6*(x1_pp(1:)-x0_pp(1:)) + a7*d1x0_pp(1:) + a8 * d2x0_pp(1:)
-
-   d1x1_pp(1:)     = d1x0_pp(1:) + a9*d2x0_pp(1:) + a10*d2x1_ppstar(1:)
-   d2x1_pp(1:)     = d2x1_ppstar(1:)
-  
+   d2x1_ppstar(1:) = a0*(x1_pp(1:)-x0_pp(1:)) - a2*d1x0_pp(1:) - a3 * d2x0_pp(1:)
+   d1x1_pp(1:)     = d1x0_pp(1:) + a6*d2x0_pp(1:) + a7*d2x1_ppstar(1:)
+   d2x1_pp(1:)     = d2x1_ppstar(1:)  
      
 !------------------------------------------------------------------------------
 ! 14. Gather Data from ntot,nels_pp to ndim,nodes_pp

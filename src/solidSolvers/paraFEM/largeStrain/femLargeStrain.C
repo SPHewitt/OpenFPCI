@@ -684,6 +684,8 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     double tol   = 1e-6;
     double tol2  = 1e-5;
     double limit = 1000;
+    double rayA = 0.0;
+    double rayB = 0.0;
     
     if (solidProperties().found("PCGTolerance"))
     {
@@ -700,13 +702,24 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         tol2 = readScalar(solidProperties().lookup("NRTolerance"));
     }
     
+    if (solidProperties().found("RayA"))
+    {
+        rayA = readScalar(solidProperties().lookup("RayA"));
+    }
     
-    numSchemes_     =  new double[5];
+    if (solidProperties().found("RayB"))
+    {
+        rayB = readScalar(solidProperties().lookup("RayB"));
+    }
+    
+    numSchemes_     =  new double[7];
     numSchemes_[0]  =  beta;  // Beta  (Typically = 0.25)
     numSchemes_[1]  =  delta; // Delta (Typically = 0.5)
-    numSchemes_[2]  =  tol;   // Tolerance for PCG loop
-    numSchemes_[3]  =  limit; // Max number of PCG iterations
-    numSchemes_[4]  =  tol2;  // Tolerance for NR Loop
+    numSchemes_[2]  =  rayA;  // Rayleigh Damping A
+    numSchemes_[3]  =  rayB;  // Rayleigh Damping B
+    numSchemes_[4]  =  tol;   // Tolerance for PCG loop
+    numSchemes_[5]  =  limit; // Max number of PCG iterations
+    numSchemes_[6]  =  tol2;  // Tolerance for NR Loop
 
     solidProps_     =  new double[3];
     solidProps_[0]  =  E_;
