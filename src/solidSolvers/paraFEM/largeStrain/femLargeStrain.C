@@ -705,11 +705,13 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     if (solidProperties().found("RayA"))
     {
         rayA = readScalar(solidProperties().lookup("RayA"));
+        Info << "Rayleigh Constant A: " << rayA << endl;
     }
     
     if (solidProperties().found("RayB"))
     {
         rayB = readScalar(solidProperties().lookup("RayB"));
+        Info << "Rayleigh Constant B: " << rayB << endl;
     }
     
     numSchemes_     =  new double[7];

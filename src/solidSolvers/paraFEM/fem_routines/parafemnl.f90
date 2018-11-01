@@ -158,7 +158,7 @@
 
   IF(nod .EQ. 8)THEN
   
-    IF(numpe .EQ. 1) PRINT*,"Element type: ",element
+    IF(numpe .EQ. 1) WRITE(*,*)"Element type: ",element
     
     ! Convert from Foam-Extend to Smith Gritths format
     DO iel=1,nels_pp
@@ -169,7 +169,7 @@
     
   ELSE IF(nod .EQ. 4)THEN
   
-     IF(numpe .EQ. 1) PRINT*,"Element type: ",element
+     IF(numpe .EQ. 1) WRITE(*,*)"Element type: ",element
      
     ! Populate the coordinate matrix
     CALL POPULATE_G_COORD_PP2(g_coord,g_coord_pp,g_num_pp,nn,nod,ndim)
@@ -195,7 +195,7 @@
       ENDIF
     ENDDO
   ELSE
-    IF(numpe .EQ. 1) PRINT*,"Element type not found"
+    IF(numpe .EQ. 1) WRITE(*,*)"Element type not found"
   END IF
 
 !----------------------------------------------------------------------
@@ -392,7 +392,7 @@
 ! 3. Start Program
 !------------------------------------------------------------------------------
 
-  IF(numpe .EQ. 1)PRINT*,"ParaFEM Large Strain Solver: "
+  IF(numpe .EQ. 1)WRITE(*,*)"ParaFEM Large Strain Solver: "
   
   ! Barrier (may not be needed but safe)
   CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
@@ -838,9 +838,9 @@
       IF (inewton==1) THEN
        energy1 = energy
       END IF
-
-      !if(numpe .EQ. 1)PRINT*,iload,inewton,energy,energy/energy1
-
+      
+      !if(numpe .EQ. 1)WRITE(*,*)iload,inewton,energy,energy/energy1
+      
       IF (inewton>1) THEN
         IF ((energy/energy1)<=tol2) THEN
           converged = .TRUE.
