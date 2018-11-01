@@ -358,7 +358,7 @@
   REAL(iwp),SAVE,ALLOCATABLE  :: points(:,:),coord(:,:),weights(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: r_pp(:),xnew_pp(:),bee(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: diag_precon_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: diag_precon_tmp(:,:), storekm_pp(:,:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: diag_precon_tmp(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: res_pp(:),fint_pp(:)
   REAL(iwp),SAVE,ALLOCATABLE  :: kmat_elem(:,:), kgeo_elem(:,:)
   REAL(iwp),SAVE,ALLOCATABLE  :: xnewel_pp(:,:), jacF(:,:),auxm(:,:)
@@ -379,8 +379,9 @@
   REAL(iwp),SAVE,ALLOCATABLE  :: fext_o_pp(:),shape_integral_pp(:,:)
 
   REAL(iwp),SAVE,ALLOCATABLE  :: fun(:),emm(:,:),ecm(:,:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: d2x1_ppstar(:),meff_pp(:)
-  REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:),ceff_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: d2x1_ppstar(:),meff_pp(:),ceff_pp(:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: storemm_pp(:,:,:),storekm_pp(:,:,:)
+  REAL(iwp),SAVE,ALLOCATABLE  :: storecm_pp(:,:,:)
 
  
   INTEGER,SAVE,ALLOCATABLE  :: num(:),nr_iters(:,:)         
@@ -482,7 +483,7 @@
   d1x1_pp  =  0._iwp;    d2x1_pp =  0._iwp;
   x1_pp    =  0._iwp;
 
-  vu_pp    =  0._iwp;    xu_pp   =  0_iwp; 
+  vu_pp    =  0._iwp;    xu_pp   =  0._iwp; 
   
   nr_timest = zero; 
 
@@ -493,6 +494,7 @@
     ALLOCATE(num(nod))
     ALLOCATE(storekm_pp(ntot,ntot,nels_pp))
     ALLOCATE(storemm_pp(ntot,ntot,nels_pp))
+    ALLOCATE(storecm_pp(ntot,ntot,nels_pp))
     ALLOCATE(kmat_elem(ntot,ntot))
     ALLOCATE(kgeo_elem(ntot,ntot))
     ALLOCATE(xnewel_pp(ntot,nels_pp))
@@ -606,10 +608,11 @@
 !-------------------------------------------------------------------------
       timest(9)     =  elap_time()
 
-      ! Clean [K] and [M] 
+      ! Clean [K], [M] and [C] 
       storekm_pp  =  zero
       storemm_pp  =  zero
-
+      storecm_pp  =  zero
+      
       DO iel = 1,nels_pp
         kmat_elem = 0._iwp
         kgeo_elem = 0._iwp
@@ -656,7 +659,7 @@
         ! Mass Matrix	   
         fun = zero
 
-	! BUG: shape_Fun in shared/new_library.f90
+        ! BUG: shape_Fun in shared/new_library.f90
         ! Line 253
         ! ndim = UBOUND(points,2) -> ndim = UBOUND(points,1)
 
@@ -690,6 +693,9 @@
 
         ! M
         storemm_pp(:,:,iel)  =  emm
+        
+        ! C
+        storecm_pp(:,:,iel)=ray_a*storemm_pp(:,:,iel)+ray_b*storekm_pp(:,:,iel)
 
       END DO ! nels_pp
 
@@ -726,7 +732,6 @@
      meff_pp(1:) = a0*(x0_pp(1:)-xnew_pp(1:)) + a2*d1x0_pp(1:) +a3*d2x0_pp(1:)
 
      temp_pp    =  zero
-     
      temp_pp = storemm_pp
      pmul_pp = zero
 
@@ -745,9 +750,8 @@
      ceff_pp = zero
      ceff_pp(1:) = a1*(x0_pp(1:)-xnew_pp(1:)) + a4*d1x0_pp(1:) + a5*d2x0_pp(1:)
      
-     temp_pp    =  zero
-     temp_pp = ray_a*storemm_pp+ray_b*storekm_pp
-     
+     temp_pp  =  zero
+     temp_pp  =  storecm_pp
      pmul_pp = zero
      
      ! C*C_eff
@@ -777,7 +781,7 @@
      END IF
 
      ! [k]
-     storekm_pp = storekm_pp + a0*storemm_pp
+     storekm_pp = storekm_pp + a0*storemm_pp + a1*storecm_pp
 
      timest(12)     =  elap_time()
      nr_timest(inewton,4)= timest(12)-timest(11)
