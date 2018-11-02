@@ -67,9 +67,9 @@ if __name__ == '__main__':
         npes = get_num_proc()
         print("Number of Processors: {0}".format(npes))
 
-    ###################
-    csvFile = "zplane_0.1.csv"
-    ##################
+    ##############################
+    csvFile = "yplane_4_0.9.csv"
+    ##############################
 
     # Extract Data for given timestep
     if(parallel):
@@ -81,15 +81,15 @@ if __name__ == '__main__':
             if os.path.isfile(fname):
                 data = read_csv(fname)
                 x_c.extend(data[:, 0])
-                y_c.extend(data[:, 1])
-                z_c.extend(data[:, 4])
+                y_c.extend(data[:, 2])
+                z_c.extend(data[:, 3])
     else:
         fname='postProcessing/'+csvFile
         if os.path.isfile(fname):
             data = read_csv(fname)
             x_c = data[:,0]
-            y_c = data[:,1]
-            z_c = data[:,4]
+            y_c = data[:,2]
+            z_c = data[:,3]
 
     x_c=np.ravel(np.array(x_c))
     y_c=np.ravel(np.array(y_c))
@@ -105,31 +105,38 @@ if __name__ == '__main__':
     # Plot the points
     #plt.scatter(x_c, y_c, marker='o', s=5, zorder=10)
 
+    ##############################
+    basic = False
+    ##############################
+
     # Plot the basic data, similar to cell plots in paraview
-    #zic = griddata((x_c, y_c), z_c, (x_c[None, :], y_c[:, None]))
-    #plt.pcolormesh(x_c, y_c, zic, cmap=plt.get_cmap('rainbow'))
+    if(basic):
+        zic = griddata((x_c, y_c), z_c, (x_c[None, :], y_c[:, None]))
+        plt.pcolormesh(x_c, y_c, zic, cmap=plt.get_cmap('RdGy'))
+    else:
+        # Plot interpolated data
+        # Create grid for interpolations
+        # Last input parameter is the number of grid points (10000) is large
+        xic = np.linspace(min(x_c), max(x_c), 3000)
+        yic = np.linspace(min(y_c), max(y_c), 3000)
 
-    # Plot interpolated data
-    # Create grid for interpolations
-    # Last input parameter is the number of grid points (10000) is large
-    xic = np.linspace(min(x_c), max(x_c), 1000)
-    yic = np.linspace(min(y_c), max(y_c), 1000)
+        ##############################
+        bands = 20
+        ##############################
 
-    zic = griddata((x_c, y_c), z_c, (xic[None,:],yic[:,None]))
-    plt.contourf(xic,yic,zic,12,cmap=plt.get_cmap('RdGy'),linewidths = 0.5)
-    cbar = plt.colorbar()
-    cbar.set_label("Pressure")
-    plt.contour(xic, yic, zic, 12,linewidths=0.5,colors='k')
+        zic = griddata((x_c, y_c), z_c, (xic[None,:],yic[:,None]))
+        plt.contourf(xic,yic,zic,bands,cmap=plt.get_cmap('RdGy'),linewidths = 0.5)
+        cbar = plt.colorbar()
+        cbar.set_label("Pressure")
+        plt.contour(xic, yic, zic,bands,linewidths=0.5,colors='k')
 
-    #plt.contour(xic,yic,zic,12,linewidths = 0.5, colors = 'k')
-    #plt.pcolormesh(xic, yic, zic,cmap = plt.get_cmap('spectral'))
-
-
+        #plt.contour(xic,yic,zic,12,linewidths = 0.5, colors = 'k')
+        #plt.pcolormesh(xic, yic, zic,cmap = plt.get_cmap('spectral'))
 
     # Create a Rectangle patch
     # Add the patch to the Axes
-    #rect = patches.Rectangle((-0.5,-0.5),1,1,linewidth=1,edgecolor='k',facecolor='k',alpha=1.0)
-    rect = patches.Rectangle((-0.5, 0), 1, 4, linewidth=1, edgecolor='k', facecolor='k', alpha=1.0)
+    rect = patches.Rectangle((-0.5,-0.5),1,1,linewidth=1,edgecolor='k',facecolor='k',alpha=1.0)
+    #rect = patches.Rectangle((-0.5, 0), 1, 4, linewidth=1, edgecolor='k', facecolor='k', alpha=1.0)
     ax.add_patch(rect)
 
 
