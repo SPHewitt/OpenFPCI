@@ -1,0 +1,4 @@
+
+cuttingPlanesFunc.C
+
+LIB = $(FOAM_USER_LIBBIN)/libcuttingPlanesFunc

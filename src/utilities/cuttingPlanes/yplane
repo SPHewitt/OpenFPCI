@@ -1,0 +1,13 @@
+cutPlane
+{
+   type cuttingPlanesFunc;
+   functionObjectLibs
+   (
+     "libcuttingPlanesFunc.so"
+   );
+
+   point (0 3 0);
+   dir (0 1 0);
+   name yplane;
+}
+
