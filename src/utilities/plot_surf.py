@@ -59,12 +59,6 @@ if __name__ == '__main__':
     print("Plotting Surface ")
     print("-------------------------------------------\n")
 
-    ################ USER PARAMETERS #####################
-    value = 'p' # Pressure
-    time  = '0.01'
-    #value = 'U' # Velocity
-    ######################################################
-
     # Check if parallel
     parallel = check_parallel()
 
@@ -73,20 +67,24 @@ if __name__ == '__main__':
         npes = get_num_proc()
         print("Number of Processors: {0}".format(npes))
 
+    ###################
+    csvFile = "zplane_0.1.csv"
+    ##################
+
     # Extract Data for given timestep
     if(parallel):
         x_c = []
         y_c = []
         z_c = []
         for i in range(npes):
-            fname='processor'+str(i)+'/postProcessing/zplane_0.01.csv'
+            fname='processor'+str(i)+'/postProcessing/'+csvFile
             if os.path.isfile(fname):
                 data = read_csv(fname)
                 x_c.extend(data[:, 0])
                 y_c.extend(data[:, 1])
                 z_c.extend(data[:, 4])
     else:
-        fname='postProcessing/zplane_0.01.csv'
+        fname='postProcessing/'+csvFile
         if os.path.isfile(fname):
             data = read_csv(fname)
             x_c = data[:,0]

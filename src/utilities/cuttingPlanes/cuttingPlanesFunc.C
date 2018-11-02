@@ -146,7 +146,14 @@ bool Foam::cuttingPlanesFunc::start()
 
 bool Foam::cuttingPlanesFunc::execute()
 {
-    return writeData();
+    if(time_.write())
+    {
+        return writeData();
+    }
+    else
+    {
+        return true;
+    }
 }
 
 
