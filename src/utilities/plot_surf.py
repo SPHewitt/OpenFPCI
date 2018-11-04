@@ -154,7 +154,7 @@ def plot_instantaneous(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap=
     plt.close()
     #plt.show()
 
-def plot_average(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap='rainbow',plane='y'):
+def plot_average(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap='rainbow',plane='y',label='Colorbar'):
     '''
         Routine plots the instantaneous values for a parameter
         of choosing
@@ -175,7 +175,7 @@ def plot_average(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap='rainb
     cbar = plt.colorbar()
     # cbar.set_clim(vmin=-1, vmax=0.4)
     # cbar.set_ticks([-1,-0.5,0,0.5])
-    cbar.set_label("Pressure")
+    cbar.set_label(label)
 
     C = plt.contour(X, Y, Z, 20, colors='black')
     # plt.clabel(C, inline=1, fontsize=10)
@@ -192,42 +192,54 @@ def plot_average(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap='rainb
     plt.close()
     # plt.show()
 
-def get_data(infile,parallel,value,plane,npes):
+def get_data(infile,parallel,npes):
     '''
     Routine to get the data from a file name
     :param fname:
     :param parallel:
     :return:
     '''
-    if plane == 'y':
-        Y=2
-    elif plane == 'z':
-        Y=1
     # Extract Data for given timestep
     if (parallel):
         x_c = []
         y_c = []
         z_c = []
+        p_c = []
+        Ux_c = []
+        Uy_c = []
+        Uz_c = []
         for i in range(npes):
             fname = 'processor' + str(i) + '/postProcessing/' + infile
             if os.path.isfile(fname):
                 data = read_csv(fname)
                 x_c.extend(data[:, 0])
-                y_c.extend(data[:, Y])
-                z_c.extend(data[:, value])
+                y_c.extend(data[:, 1])
+                z_c.extend(data[:, 2])
+                p_c.extend(data[:, 3])
+                Ux_c.extend(data[:, 4])
+                Uy_c.extend(data[:, 5])
+                Uz_c.extend(data[:, 6])
     else:
         fname = 'postProcessing/' + infile
         if os.path.isfile(fname):
             data = read_csv(fname)
             x_c = data[:, 0]
-            y_c = data[:, Y]
-            z_c = data[:, value]
+            y_c = data[:, 1]
+            z_c = data[:, 2]
+            p_c = data[:, 3]
+            Ux_c = data[:, 4]
+            Uy_c = data[:, 5]
+            Uz_c = data[:, 6]
 
     x_c = np.ravel(np.array(x_c))
     y_c = np.ravel(np.array(y_c))
     z_c = np.ravel(np.array(z_c))
+    p_c = np.ravel(np.array(p_c))
+    Ux_c = np.ravel(np.array(Ux_c))
+    Uy_c = np.ravel(np.array(Uy_c))
+    Uz_c = np.ravel(np.array(Uz_c))
 
-    dict = {'X':x_c,'Y':y_c,'Z':z_c}
+    dict = {'X':x_c,'Y':y_c,'Z':z_c,'pressure':p_c,'Ux':Ux_c,'Uy':Uy_c,'Uz':Uz_c}
     return dict
 
 if __name__ == '__main__':
@@ -246,13 +258,8 @@ if __name__ == '__main__':
         print("Number of Processors: {0}".format(npes))
 
     ##############################
-
     csvFile = "yplane_4_119.625.csv"
     outFile = "yplane_4_119.pdf"
-
-    # 3 - Pressure
-    # (4,5,6) - Ux,Uy,Uz
-    property = 3
     ##############################
 
     print("\n-------------------------------------------")
@@ -260,17 +267,18 @@ if __name__ == '__main__':
     print("-------------------------------------------\n")
 
     # Get the data
-    data = get_data(csvFile,parallel,3,'y',npes)
+    data = get_data(csvFile,parallel,npes)
 
     # Plot the Instantaneous flow
-    plot_instantaneous(data['X'],data['Y'],data['Z'],outFile,plane='y')
+    plot_instantaneous(data['X'],data['Z'],data['pressure'],outFile,plane='y')
 
     #####################################################################################
 
     ##############################
     plane_name ="yplane_4"
-    csvFile = "yplane_4_118.5.csv"
-    outFile = "yplane_4_average.pdf"
+    csvFile = plane_name+"_118.5.csv"
+    outFile = plane_name+"_average_Uz.pdf"
+    value='Uz' #'pressure,Ux,Uy,Uz
     ##############################
 
     print("\n-------------------------------------------")
@@ -304,21 +312,21 @@ if __name__ == '__main__':
     first = True
     for i in file_list:
         fname=plane_name+'_'+str(i)+'.csv'
-        data = get_data(fname, parallel, 3, 'y', npes)
+        data = get_data(fname, parallel, npes)
         if first:
             # CREATE BASE GRID
             xic = np.linspace(min(data['X']), max(data['X']), 1000)
-            yic = np.linspace(min(data['Y']), max(data['Y']), 1000)
+            yic = np.linspace(min(data['Z']), max(data['Z']), 1000)
             first = False
-            zic_average = griddata((data['X'], data['Y']), data['Z'], (xic[None, :], yic[:, None]))
+            zic_average = griddata((data['X'], data['Z']), data[value], (xic[None, :], yic[:, None]))
         else:
-            zic_average = np.add(zic_average,griddata((data['X'], data['Y']),
-                                data['Z'], (xic[None, :], yic[:, None])))
+            zic_average = np.add(zic_average,griddata((data['X'], data['Z']),
+                                data[value], (xic[None, :], yic[:, None])))
 
     zic_average = zic_average/time_count
 
     # Plot the Average flow
-    plot_average(xic, yic, zic_average, outFile, plane='y')
+    plot_average(xic, yic, zic_average, outFile, plane='y',label=value)
 
 
 

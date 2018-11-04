@@ -26,6 +26,7 @@ Author
 
 \*----------------------------------------------------------------------------*/
 
+#include "fvc.H"
 #include "cuttingPlanesFunc.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
@@ -73,12 +74,25 @@ bool Foam::cuttingPlanesFunc::writeData()
 
             const volVectorField& U =
             mesh.lookupObject<volVectorField>("U");
+
+            volVectorField vorticity
+            (
+                IOobject
+                (
+                    "vorticity",
+                    time_.timeName(),
+                    mesh,
+                    IOobject::NO_READ
+                ),
+                fvc::curl(U)
+            );
+
          
             fileName outFile(planeName_+"_"+time_.timeName()+".csv");
             
             OFstream os(time_.path()/"postProcessing"/outFile);
             os << "# X" << tab << "Y" << tab << "Z" << tab << "p";
-            os << tab << "U(x,y,z)"<< endl;
+            os << tab << "U(x,y,z)" << tab << "Vort(x,y,z)"<< endl;
             forAll(cutCells,i)          
             {
                 os << mesh.C()[cutCells[i]].x() << ",";
@@ -87,7 +101,10 @@ bool Foam::cuttingPlanesFunc::writeData()
                 os << p[cutCells[i]] << ",";
                 os << U[cutCells[i]].x() << ",";
                 os << U[cutCells[i]].y() << ",";
-                os << U[cutCells[i]].z();
+                os << U[cutCells[i]].z() << ",";
+                os << vorticity[cutCells[i]].x() << ",";
+                os << vorticity[cutCells[i]].y() << ",";
+                os << vorticity[cutCells[i]].z();
                 os << endl;
             }
         }        
