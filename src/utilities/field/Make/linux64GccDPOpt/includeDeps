@@ -1,4 +1,0 @@
-include fieldAverage/fieldAverage/fieldAverage.dep
-include fieldAverage/fieldAverageItem/fieldAverageItem.dep
-include fieldAverage/fieldAverageItem/fieldAverageItemIO.dep
-include fieldAverage/fieldAverageFunctionObject/fieldAverageFunctionObject.dep

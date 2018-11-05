@@ -1,5 +1,0 @@
-DEPENDENCIES = \
-fieldAverage/fieldAverage/fieldAverage.dep\
-fieldAverage/fieldAverageItem/fieldAverageItem.dep\
-fieldAverage/fieldAverageItem/fieldAverageItemIO.dep\
-fieldAverage/fieldAverageFunctionObject/fieldAverageFunctionObject.dep

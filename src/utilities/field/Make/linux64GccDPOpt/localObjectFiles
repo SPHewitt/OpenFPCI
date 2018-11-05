@@ -1,5 +1,0 @@
-LOCAL_OBJECTS = \
-fieldAverage.o\
-fieldAverageItem.o\
-fieldAverageItemIO.o\
-fieldAverageFunctionObject.o
