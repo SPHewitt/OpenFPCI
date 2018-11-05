@@ -1,0 +1,6 @@
+fieldAverage/fieldAverage/fieldAverage.C
+fieldAverage/fieldAverageItem/fieldAverageItem.C
+fieldAverage/fieldAverageItem/fieldAverageItemIO.C
+fieldAverage/fieldAverageFunctionObject/fieldAverageFunctionObject.C
+
+LIB = $(FOAM_USER_LIBBIN)/libfieldFunctionObjectsCustom

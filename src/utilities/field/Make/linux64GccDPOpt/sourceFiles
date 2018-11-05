@@ -1,0 +1,5 @@
+SOURCE = \
+fieldAverage/fieldAverage/fieldAverage.C\
+fieldAverage/fieldAverageItem/fieldAverageItem.C\
+fieldAverage/fieldAverageItem/fieldAverageItemIO.C\
+fieldAverage/fieldAverageFunctionObject/fieldAverageFunctionObject.C

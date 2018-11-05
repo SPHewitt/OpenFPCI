@@ -1,0 +1,5 @@
+OBJECTS = \
+$(OBJECTS_DIR)/fieldAverage.o\
+$(OBJECTS_DIR)/fieldAverageItem.o\
+$(OBJECTS_DIR)/fieldAverageItemIO.o\
+$(OBJECTS_DIR)/fieldAverageFunctionObject.o
