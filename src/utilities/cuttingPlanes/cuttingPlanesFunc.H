@@ -73,11 +73,24 @@ class cuttingPlanesFunc
         //- Name of Plane;
         word planeName_;
 
+        //- Start time
+        scalar startTime_;
+    
+        //- Velocity Field
+        wordList meanScalarFields_;
+
+        //- Pressure Mean
+        wordList meanVectorFields_;
+
+        //- UPrime2Mean
+        //volSymmTensorField UPrime2Mean_;
+
+
     // Private Member Functions
 
         //- Write data
         bool writeData();
-
+        
         //- Disallow default bitwise copy construct
         cuttingPlanesFunc
         (

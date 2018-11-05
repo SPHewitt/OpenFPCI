@@ -11,7 +11,7 @@ import numpy as np
 
 from scipy.interpolate import griddata
 
-
+#### Misc Functions
 def read_csv(fname):
     '''
     Routine reads a csv file with ',' delimiter
@@ -38,6 +38,39 @@ def check_parallel():
 
     return flag
 
+def create_average(dict,plane_name):
+    '''
+    Routine creates a base grid based and interpolates all
+    files in file list onto gird, and averages
+    :param dict:
+    :param plane_name:
+    :return:
+    '''
+    # CREATE BASE GRID
+    # Create base grid with which to map the new values onto
+    # Load in a single time
+    file_list=dict['files']
+    time_count=dict['time_count']
+
+    first = True
+    for i in file_list:
+        fname = plane_name + '_' + str(i) + '.csv'
+        data = get_data(fname, parallel, npes)
+        if first:
+            # CREATE BASE GRID
+            xic = np.linspace(min(data['X']), max(data['X']), 1000)
+            yic = np.linspace(min(data['Z']), max(data['Z']), 1000)
+            first = False
+            zic_average = griddata((data['X'], data['Z']), data[value], (xic[None, :], yic[:, None]))
+        else:
+            zic_average = np.add(zic_average, griddata((data['X'], data['Z']),
+                                                       data[value], (xic[None, :], yic[:, None])))
+
+    zic_average = zic_average / time_count
+    out_dict={'xic':xic,'yic':yic,'zic_average':zic_average}
+    return out_dict
+
+#### Get Functions ####
 def get_num_proc():
     '''
     Crude way of counting processors
@@ -83,6 +116,88 @@ def get_beam_position(X,Y,plane):
     dict = {'xmin':xmin,'ymin':ymin,'width':width,'height':height}
     return dict
 
+def get_data(infile,parallel,npes):
+    '''
+    Routine to get the data from a file name
+    :param fname:
+    :param parallel:
+    :return:
+    '''
+    # Extract Data for given timestep
+    if (parallel):
+        x_c = []
+        y_c = []
+        z_c = []
+        p_c = []
+        Ux_c = []
+        Uy_c = []
+        Uz_c = []
+        for i in range(npes):
+            fname = 'processor' + str(i) + '/postProcessing/' + infile
+            if os.path.isfile(fname):
+                data = read_csv(fname)
+                x_c.extend(data[:, 0])
+                y_c.extend(data[:, 1])
+                z_c.extend(data[:, 2])
+                p_c.extend(data[:, 3])
+                Ux_c.extend(data[:, 4])
+                Uy_c.extend(data[:, 5])
+                Uz_c.extend(data[:, 6])
+    else:
+        fname = 'postProcessing/' + infile
+        if os.path.isfile(fname):
+            data = read_csv(fname)
+            x_c = data[:, 0]
+            y_c = data[:, 1]
+            z_c = data[:, 2]
+            p_c = data[:, 3]
+            Ux_c = data[:, 4]
+            Uy_c = data[:, 5]
+            Uz_c = data[:, 6]
+
+    x_c = np.ravel(np.array(x_c))
+    y_c = np.ravel(np.array(y_c))
+    z_c = np.ravel(np.array(z_c))
+    p_c = np.ravel(np.array(p_c))
+    Ux_c = np.ravel(np.array(Ux_c))
+    Uy_c = np.ravel(np.array(Uy_c))
+    Uz_c = np.ravel(np.array(Uz_c))
+
+    dict = {'X':x_c,'Y':y_c,'Z':z_c,'pressure':p_c,'Ux':Ux_c,'Uy':Uy_c,'Uz':Uz_c}
+    return dict
+
+def get_file_list(plane_name,npes):
+    '''
+    Get a list of timestep files
+    :return:
+    '''
+    # Find number of time steps in a dir and get a sorted file List
+    flag = False
+    for i in range(npes):
+        path = 'processor' + str(i) + '/postProcessing/'
+        for j in os.listdir(path):
+            if plane_name in j:
+                flag = True
+        if (flag):
+            break
+
+    # Create list of file numbers
+    tmp_list = []
+    for file in os.listdir(path):
+        if plane_name in file:
+            tmp = file.replace(plane_name, '').replace('_', '').replace('.csv', '')
+            if tmp == '0':
+                continue
+            else:
+                tmp_list.append(tmp)
+        exit
+
+    file_list = sorted(tmp_list)
+    time_count = len(file_list)
+    dict={'files':file_list,'time_count':time_count}
+    return dict
+
+#### Plotting Functions ####
 def plot_instantaneous(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap='rainbow',plane='y'):
     '''
     Routine plots the instantaneous values for a parameter
@@ -192,56 +307,6 @@ def plot_average(X,Y,Z,figname,figuresize=(7.54,2.5),basic=False,colormap='rainb
     plt.close()
     # plt.show()
 
-def get_data(infile,parallel,npes):
-    '''
-    Routine to get the data from a file name
-    :param fname:
-    :param parallel:
-    :return:
-    '''
-    # Extract Data for given timestep
-    if (parallel):
-        x_c = []
-        y_c = []
-        z_c = []
-        p_c = []
-        Ux_c = []
-        Uy_c = []
-        Uz_c = []
-        for i in range(npes):
-            fname = 'processor' + str(i) + '/postProcessing/' + infile
-            if os.path.isfile(fname):
-                data = read_csv(fname)
-                x_c.extend(data[:, 0])
-                y_c.extend(data[:, 1])
-                z_c.extend(data[:, 2])
-                p_c.extend(data[:, 3])
-                Ux_c.extend(data[:, 4])
-                Uy_c.extend(data[:, 5])
-                Uz_c.extend(data[:, 6])
-    else:
-        fname = 'postProcessing/' + infile
-        if os.path.isfile(fname):
-            data = read_csv(fname)
-            x_c = data[:, 0]
-            y_c = data[:, 1]
-            z_c = data[:, 2]
-            p_c = data[:, 3]
-            Ux_c = data[:, 4]
-            Uy_c = data[:, 5]
-            Uz_c = data[:, 6]
-
-    x_c = np.ravel(np.array(x_c))
-    y_c = np.ravel(np.array(y_c))
-    z_c = np.ravel(np.array(z_c))
-    p_c = np.ravel(np.array(p_c))
-    Ux_c = np.ravel(np.array(Ux_c))
-    Uy_c = np.ravel(np.array(Uy_c))
-    Uz_c = np.ravel(np.array(Uz_c))
-
-    dict = {'X':x_c,'Y':y_c,'Z':z_c,'pressure':p_c,'Ux':Ux_c,'Uy':Uy_c,'Uz':Uz_c}
-    return dict
-
 if __name__ == '__main__':
 
     # Heading
@@ -273,62 +338,53 @@ if __name__ == '__main__':
     plot_instantaneous(data['X'],data['Z'],data['pressure'],outFile,plane='y')
 
     #####################################################################################
+    #####################################################################################
+    #####################################################################################
+    # PLOTTING AVERAGES
 
     ##############################
     plane_name ="yplane_4"
-    csvFile = plane_name+"_118.5.csv"
-    outFile = plane_name+"_average_Uz.pdf"
-    value='Uz' #'pressure,Ux,Uy,Uz
+    value='Uy' #'pressure,Ux,Uy,Uz
+
+    outFile = plane_name+"_average_"+value+".pdf"
     ##############################
 
     print("\n-------------------------------------------")
     print("Plotting Average for {0}".format(plane_name))
     print("-------------------------------------------\n")
 
+    dict = get_file_list(plane_name, npes)
 
-    # Find number of timeSteps in a dir and get a sorted file List
-    for i in range(npes):
-        fname = 'processor' + str(i) + '/postProcessing/' + csvFile
-        if os.path.isfile(fname):
-            path = 'processor' + str(i) + '/postProcessing/'
-            # Create list of file numbers
-            tmp_list = []
-            for file in os.listdir(path):
-                if plane_name in file:
-                    tmp = file.replace(plane_name,'').replace('_','').replace('.csv','')
-                    if tmp == '0':
-                        continue
-                    else:
-                        tmp_list.append(tmp)
-            exit
-    file_list = sorted(tmp_list)
-    time_count = len(file_list)
-
-    print("Number of time steps: {0}".format(time_count))
-
-    # CREATE BASE GRID
-    # Create base grid with which to map the new values onto
-    # Load in a single time
-    first = True
-    for i in file_list:
-        fname=plane_name+'_'+str(i)+'.csv'
-        data = get_data(fname, parallel, npes)
-        if first:
-            # CREATE BASE GRID
-            xic = np.linspace(min(data['X']), max(data['X']), 1000)
-            yic = np.linspace(min(data['Z']), max(data['Z']), 1000)
-            first = False
-            zic_average = griddata((data['X'], data['Z']), data[value], (xic[None, :], yic[:, None]))
-        else:
-            zic_average = np.add(zic_average,griddata((data['X'], data['Z']),
-                                data[value], (xic[None, :], yic[:, None])))
-
-    zic_average = zic_average/time_count
+    print("Number of time steps: {0}".format(dict['time_count']))
+    dict = create_average(dict, plane_name)
+    xic = dict['xic']
+    yic = dict['yic']
+    zic_average = dict['zic_average']
 
     # Plot the Average flow
     plot_average(xic, yic, zic_average, outFile, plane='y',label=value)
 
+    #####################################################################################
+    #####################################################################################
+    #####################################################################################
 
+    sys.exit()
+    # Plotting Vorticity
+    data = get_data("yplane_4_119.625.csv", parallel, npes)
+
+    dUx=np.gradient(data['Ux'])
+    dUy=np.gradient(data['Uy'])
+    dUz=np.gradient(data['Uz'])
+
+    dx=np.gradient(data['X'])
+    dy=np.gradient(data['Y'])
+    dz=np.gradient(data['Z'])
+
+    print data['Z']
+    print(dz)
+
+    #vorticity = (dUz/dy - dUy/dz) + (dUx/dz - dUz/dx) + (dUy/dx-dUx/dy)
+    vorticity = np.divide(dUy,dz)
 
 
 

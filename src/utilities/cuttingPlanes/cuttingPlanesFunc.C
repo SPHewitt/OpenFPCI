@@ -25,7 +25,6 @@ Author
     Sam Hewitt, University of Manchester.  All rights reserved
 
 \*----------------------------------------------------------------------------*/
-
 #include "fvc.H"
 #include "cuttingPlanesFunc.H"
 #include "addToRunTimeSelectionTable.H"
@@ -37,6 +36,7 @@ Author
 #include "plane.H"
 #include "cuttingPlane.H"
 #include "cellSet.H"
+#include "fieldAverage.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -74,7 +74,17 @@ bool Foam::cuttingPlanesFunc::writeData()
 
             const volVectorField& U =
             mesh.lookupObject<volVectorField>("U");
+           
+            const volVectorField UMean = 
+            mesh.lookupObject<volVectorField>("UMean");
 
+            const volScalarField pMean = 
+            mesh.lookupObject<volScalarField>("pMean");
+
+            const volSymmTensorField UPrime2Mean = 
+            mesh.lookupObject<volSymmTensorField>("UPrime2Mean");
+            
+            // Calculate Vorticity Field
             volVectorField vorticity
             (
                 IOobject
@@ -87,21 +97,38 @@ bool Foam::cuttingPlanesFunc::writeData()
                 fvc::curl(U)
             );
 
-         
             fileName outFile(planeName_+"_"+time_.timeName()+".csv");
-            
+        
+            //IOStream IOstream::streamFormat("binary")
+
             OFstream os(time_.path()/"postProcessing"/outFile);
-            os << "# X" << tab << "Y" << tab << "Z" << tab << "p";
-            os << tab << "U(x,y,z)" << tab << "Vort(x,y,z)"<< endl;
+            os << "# x, y, z, p, pmean, u(x,y,z), Umean(x,y,z), ";
+            os << "UU, VV, WW, UV, VW, UW, Vort(x,y,z)" << endl;
+
             forAll(cutCells,i)          
             {
                 os << mesh.C()[cutCells[i]].x() << ",";
                 os << mesh.C()[cutCells[i]].y() << ",";
                 os << mesh.C()[cutCells[i]].z() << ",";
+
                 os << p[cutCells[i]] << ",";
+                os << pMean[cutCells[i]]<< ",";
+                
                 os << U[cutCells[i]].x() << ",";
                 os << U[cutCells[i]].y() << ",";
                 os << U[cutCells[i]].z() << ",";
+                
+                os << UMean[cutCells[i]].x() << ",";
+                os << UMean[cutCells[i]].y() << ",";
+                os << UMean[cutCells[i]].z() << ",";
+                
+                os << UPrime2Mean[cutCells[i]].xx() << ",";
+                os << UPrime2Mean[cutCells[i]].yy() << ",";
+                os << UPrime2Mean[cutCells[i]].zz() << ",";
+                os << UPrime2Mean[cutCells[i]].xy() << ",";
+                os << UPrime2Mean[cutCells[i]].yz() << ",";
+                os << UPrime2Mean[cutCells[i]].xz() << ",";
+
                 os << vorticity[cutCells[i]].x() << ",";
                 os << vorticity[cutCells[i]].y() << ",";
                 os << vorticity[cutCells[i]].z();
@@ -128,22 +155,14 @@ Foam::cuttingPlanesFunc::cuttingPlanesFunc
     time_(t),
     point_(dict.lookup("point")),
     dir_(dict.lookup("dir")),
-    planeName_(dict.lookup("name"))
+    planeName_(dict.lookup("name")),
+    startTime_(readScalar(dict.lookup("startTime")))
 {
     Info << "Creating " << this->name() << " function object." << endl;
 
-    // Create Pressure dir if not already created
+    // Create postProcessing dir
     fileName outputDir;
-    if (Pstream::parRun())
-    {
-        // Put in undecomposed case (Note: gives problems for
-        // distributed data running)
-        outputDir = time_.path()/"postProcessing";
-    }
-    else
-    {
-        outputDir = time_.path()/"postProcessing";
-    }
+    outputDir = time_.path()/"postProcessing";
 
     if(!isDir(outputDir))
     {
@@ -163,7 +182,7 @@ bool Foam::cuttingPlanesFunc::start()
 
 bool Foam::cuttingPlanesFunc::execute()
 {
-    if(time_.write())
+    if(time_.write() && time_.value()>=startTime_)
     {
         return writeData();
     }
@@ -176,6 +195,11 @@ bool Foam::cuttingPlanesFunc::execute()
 
 bool Foam::cuttingPlanesFunc::read(const dictionary& dict)
 {
+    if(dict.found("startTime"))
+    {
+        startTime_ = readScalar(dict.lookup("startTime"));
+    }
+
     return true;
 }
 
