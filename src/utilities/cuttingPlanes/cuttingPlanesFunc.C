@@ -36,7 +36,6 @@ Author
 #include "plane.H"
 #include "cuttingPlane.H"
 #include "cellSet.H"
-#include "fieldAverage.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -57,87 +56,78 @@ namespace Foam
 
 bool Foam::cuttingPlanesFunc::writeData()
 {
+
+    // Reference to Mesh
     const fvMesh& mesh =
         time_.lookupObject<fvMesh>(polyMesh::defaultRegion);
 
+    // Create Cutting plane
     plane pl1(point_,dir_);
     cuttingPlane cutPlane(pl1,mesh);
 
+    // Create cellSet of cut cells
     const labelList& cutCells = cutPlane.cutCells();
 
+    // Lookup fields to write
+    // Note: only vorticity needs to be outside
+    // the cutCells loop
+    const volScalarField& p =
+    mesh.lookupObject<volScalarField>("p");
+
+    const volVectorField& U =
+    mesh.lookupObject<volVectorField>("U");
+    
+    const volVectorField UMean = 
+    mesh.lookupObject<volVectorField>("UMean");
+
+    const volScalarField pMean = 
+    mesh.lookupObject<volScalarField>("pMean");
+
+    const volSymmTensorField UPrime2Mean = 
+    mesh.lookupObject<volSymmTensorField>("UPrime2Mean");
+    
+    const volVectorField& vorticity = fvc::curl(U);
+    
     if(cutCells.size()>0)
-    {
-        if (mesh.foundObject<volScalarField>("p"))
-        {
-            const volScalarField& p =
-            mesh.lookupObject<volScalarField>("p");
+    { 
+       fileName outFile(planeName_+"_"+time_.timeName()+".csv");
+    
+       OFstream os(time_.path()/"postProcessing"/outFile);
+       os << "# x, y, z, p, pmean, u(x,y,z), Umean(x,y,z), ";
+       os << "UU, VV, WW, UV, VW, UW, Vort(x,y,z)" << endl;
 
-            const volVectorField& U =
-            mesh.lookupObject<volVectorField>("U");
+       forAll(cutCells,i)          
+       {
+           os << mesh.C()[cutCells[i]].x() << ",";
+           os << mesh.C()[cutCells[i]].y() << ",";
+           os << mesh.C()[cutCells[i]].z() << ",";
+
+           os << p[cutCells[i]] << ",";
+           os << pMean[cutCells[i]]<< ",";
            
-            const volVectorField UMean = 
-            mesh.lookupObject<volVectorField>("UMean");
+           os << U[cutCells[i]].x() << ",";
+           os << U[cutCells[i]].y() << ",";
+           os << U[cutCells[i]].z() << ",";
+           
+           os << UMean[cutCells[i]].x() << ",";
+           os << UMean[cutCells[i]].y() << ",";
+           os << UMean[cutCells[i]].z() << ",";
+           
+           os << UPrime2Mean[cutCells[i]].xx() << ",";
+           os << UPrime2Mean[cutCells[i]].yy() << ",";
+           os << UPrime2Mean[cutCells[i]].zz() << ",";
+           os << UPrime2Mean[cutCells[i]].xy() << ",";
+           os << UPrime2Mean[cutCells[i]].yz() << ",";
+           os << UPrime2Mean[cutCells[i]].xz() << ",";
 
-            const volScalarField pMean = 
-            mesh.lookupObject<volScalarField>("pMean");
+           os << vorticity[cutCells[i]].x() << ",";
+           os << vorticity[cutCells[i]].y() << ",";
+           os << vorticity[cutCells[i]].z();
+           os << endl;
+       }
 
-            const volSymmTensorField UPrime2Mean = 
-            mesh.lookupObject<volSymmTensorField>("UPrime2Mean");
-            
-            // Calculate Vorticity Field
-            volVectorField vorticity
-            (
-                IOobject
-                (
-                    "vorticity",
-                    time_.timeName(),
-                    mesh,
-                    IOobject::NO_READ
-                ),
-                fvc::curl(U)
-            );
-
-            fileName outFile(planeName_+"_"+time_.timeName()+".csv");
-        
-            //IOStream IOstream::streamFormat("binary")
-
-            OFstream os(time_.path()/"postProcessing"/outFile);
-            os << "# x, y, z, p, pmean, u(x,y,z), Umean(x,y,z), ";
-            os << "UU, VV, WW, UV, VW, UW, Vort(x,y,z)" << endl;
-
-            forAll(cutCells,i)          
-            {
-                os << mesh.C()[cutCells[i]].x() << ",";
-                os << mesh.C()[cutCells[i]].y() << ",";
-                os << mesh.C()[cutCells[i]].z() << ",";
-
-                os << p[cutCells[i]] << ",";
-                os << pMean[cutCells[i]]<< ",";
-                
-                os << U[cutCells[i]].x() << ",";
-                os << U[cutCells[i]].y() << ",";
-                os << U[cutCells[i]].z() << ",";
-                
-                os << UMean[cutCells[i]].x() << ",";
-                os << UMean[cutCells[i]].y() << ",";
-                os << UMean[cutCells[i]].z() << ",";
-                
-                os << UPrime2Mean[cutCells[i]].xx() << ",";
-                os << UPrime2Mean[cutCells[i]].yy() << ",";
-                os << UPrime2Mean[cutCells[i]].zz() << ",";
-                os << UPrime2Mean[cutCells[i]].xy() << ",";
-                os << UPrime2Mean[cutCells[i]].yz() << ",";
-                os << UPrime2Mean[cutCells[i]].xz() << ",";
-
-                os << vorticity[cutCells[i]].x() << ",";
-                os << vorticity[cutCells[i]].y() << ",";
-                os << vorticity[cutCells[i]].z();
-                os << endl;
-            }
-        }        
-
-    }
-
+    } // if cutCells.size() > 0
+    
     return true;
 }
 
