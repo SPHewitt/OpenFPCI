@@ -69,8 +69,6 @@ bool Foam::cuttingPlanesFunc::writeData()
     const labelList& cutCells = cutPlane.cutCells();
 
     // Lookup fields to write
-    // Note: only vorticity needs to be outside
-    // the cutCells loop
     const volScalarField& p =
     mesh.lookupObject<volScalarField>("p");
 
@@ -85,8 +83,9 @@ bool Foam::cuttingPlanesFunc::writeData()
 
     const volSymmTensorField UPrime2Mean = 
     mesh.lookupObject<volSymmTensorField>("UPrime2Mean");
-    
-    const volVectorField& vorticity = fvc::curl(U);
+   
+    // Calculate vorticity
+    volVectorField vorticity = fvc::curl(U);
     
     if(cutCells.size()>0)
     { 
