@@ -89,40 +89,43 @@ bool Foam::cuttingPlanesFunc::writeData()
     
     if(cutCells.size()>0)
     { 
-       fileName outFile(planeName_+"_"+time_.timeName()+".csv");
-    
-       OFstream os(time_.path()/"postProcessing"/outFile);
-       os << "# x, y, z, p, pmean, u(x,y,z), Umean(x,y,z), ";
-       os << "UU, VV, WW, UV, VW, UW, Vort(x,y,z)" << endl;
-
+       fileName outFile(planeName_+"_"+time_.timeName());
+         
+       ofstream os(time_.path()/"postProcessing"/outFile, std::ios::out | std::ios::binary);
        forAll(cutCells,i)          
        {
-           os << mesh.C()[cutCells[i]].x() << ",";
-           os << mesh.C()[cutCells[i]].y() << ",";
-           os << mesh.C()[cutCells[i]].z() << ",";
+            // Coordinates
+            os.write((char*)(&mesh.C()[cutCells[i]].x()),sizeof(double));   
+            os.write((char*)(&mesh.C()[cutCells[i]].y()),sizeof(double));   
+            os.write((char*)(&mesh.C()[cutCells[i]].z()),sizeof(double));   
+        
+            // Pressures
+            os.write((char*)(&p[cutCells[i]]),sizeof(double));   
+            os.write((char*)(&pMean[cutCells[i]]),sizeof(double));  
 
-           os << p[cutCells[i]] << ",";
-           os << pMean[cutCells[i]]<< ",";
-           
-           os << U[cutCells[i]].x() << ",";
-           os << U[cutCells[i]].y() << ",";
-           os << U[cutCells[i]].z() << ",";
-           
-           os << UMean[cutCells[i]].x() << ",";
-           os << UMean[cutCells[i]].y() << ",";
-           os << UMean[cutCells[i]].z() << ",";
-           
-           os << UPrime2Mean[cutCells[i]].xx() << ",";
-           os << UPrime2Mean[cutCells[i]].yy() << ",";
-           os << UPrime2Mean[cutCells[i]].zz() << ",";
-           os << UPrime2Mean[cutCells[i]].xy() << ",";
-           os << UPrime2Mean[cutCells[i]].yz() << ",";
-           os << UPrime2Mean[cutCells[i]].xz() << ",";
+            // Velocities (instantaneous)
+            os.write((char*)(&U[cutCells[i]].x()),sizeof(double));   
+            os.write((char*)(&U[cutCells[i]].y()),sizeof(double));
+            os.write((char*)(&U[cutCells[i]].z()),sizeof(double));
 
-           os << vorticity[cutCells[i]].x() << ",";
-           os << vorticity[cutCells[i]].y() << ",";
-           os << vorticity[cutCells[i]].z();
-           os << endl;
+            // Velocities (Mean)
+            os.write((char*)(&UMean[cutCells[i]].x()),sizeof(double));   
+            os.write((char*)(&UMean[cutCells[i]].y()),sizeof(double));
+            os.write((char*)(&UMean[cutCells[i]].z()),sizeof(double));
+            
+            // UPrime2Mean
+            os.write((char*)(&UPrime2Mean[cutCells[i]].xx()),sizeof(double));   
+            os.write((char*)(&UPrime2Mean[cutCells[i]].yy()),sizeof(double));
+            os.write((char*)(&UPrime2Mean[cutCells[i]].zz()),sizeof(double));
+            os.write((char*)(&UPrime2Mean[cutCells[i]].xy()),sizeof(double));   
+            os.write((char*)(&UPrime2Mean[cutCells[i]].yz()),sizeof(double));
+            os.write((char*)(&UPrime2Mean[cutCells[i]].xz()),sizeof(double));
+            
+            // Vorticity
+            os.write((char*)(&vorticity[cutCells[i]].x()),sizeof(double));   
+            os.write((char*)(&vorticity[cutCells[i]].y()),sizeof(double));
+            os.write((char*)(&vorticity[cutCells[i]].z()),sizeof(double));
+            
        }
 
     } // if cutCells.size() > 0
