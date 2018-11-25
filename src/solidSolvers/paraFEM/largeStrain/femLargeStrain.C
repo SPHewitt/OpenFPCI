@@ -143,6 +143,10 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     rest_ensi_(NULL),
     numFixedForceNodes_(0),
     forceNodes_(NULL),
+    globalForceNodes_(NULL),
+    forceLocalGlobalMap_(NULL),
+    numGlobalForceNodes_(0),
+    processorCount_(NULL),
     fext_OF_(NULL),
     nodeensi_(NULL),
     sense_(NULL),
@@ -155,6 +159,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     ptUtemp_(0),
     ptAtemp_(0),
     rbfUpdate_(false),
+    primitivePatchUpdate_(false),
     twoDimensional_(false),
     D_
     (
@@ -302,9 +307,14 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     if (solidProperties().found("rbfUpdate"))
     {
         rbfUpdate_ = Switch(solidProperties().lookup("rbfUpdate"));
+        Info << "rbfUpdate: " << rbfUpdate_ << endl;
+    }
+    if(solidProperties().found("primitivePatchUpdate"))
+    {
+        primitivePatchUpdate_ = Switch(solidProperties().lookup("primitivePatchUpdate"));
+        Info << "Primitive Patch Update: " << primitivePatchUpdate_ << endl; 
     }
 
-    Info << "rbfUpdate: " << rbfUpdate_ << endl;
 
     // - ParaFEM construction 
     E_ 		=  rheology_.law().E()()[0];
@@ -859,6 +869,113 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     {
  	fext_OF_[i]=0;
     }
+
+//------------------------------------------------------------------------------
+//  Create global forced nodes array
+// -----------------------------------------------------------------------------
+    // Declare local force nodes List    
+    labelList localNodes(numFixedForceNodes_);
+
+    // Populate the local list
+    for(int i=0; i<numFixedForceNodes_; i++)
+    {
+ 	    localNodes[i]=forceNodes_[i];
+    }
+
+    // Sort lists
+    sort(localNodes);
+    int numlocalNodes = localNodes.size();
+
+    // Create a global list
+    List<List<label>> globalNodes(Pstream::nProcs(), localNodes);   
+    
+    // Gather All Lists
+    Pstream::gatherList(globalNodes);
+    Pstream::scatterList(globalNodes); 
+
+    // Create master nodes list;
+    reduce(numlocalNodes,sumOp<int>());
+
+    labelList masterNodes (numlocalNodes);
+
+    label nodeIndex = 0;
+    forAll(globalNodes,procI)
+    {
+        forAll(globalNodes[procI],pointI)
+        {
+            masterNodes[nodeIndex]=globalNodes[procI][pointI];
+            nodeIndex++;
+        }
+    }
+
+    //Sort and find duplicate nodes
+    sort(masterNodes);
+    //labelList duplicateNodes;
+    duplicateOrder(masterNodes,duplicateNodes);
+
+    // Create globalForceNodes_   
+    numGlobalForceNodes_ = masterNodes.size()-duplicateNodes.size();
+    globalForceNodes_ = new int [numGlobalForceNodes_];
+    nodeIndex=0;
+    forAll(masterNodes,pointI)
+    {
+         if ((pointI > 0) && (masterNodes[pointI] == masterNodes[pointI-1]))
+         {
+	     // If exists continue
+	        continue;
+         }
+         else
+         {
+	     // If doesnt exist insert into rest
+             globalForceNodes_[nodeIndex]=masterNodes[pointI];
+             nodeIndex++;
+         } 
+    }
+
+    // Now create local to global mapping
+    forceLocalGlobalMap_ = new int[numFixedForceNodes_];
+
+    // loop through local values
+    for(int i=0; i < numFixedForceNodes_;i++)
+    {
+        // loop through global values
+        for(int j =0; j < numGlobalForceNodes_;j++)
+        {  
+            if(forceNodes_[i]==globalForceNodes_[j])
+            {
+                forceLocalGlobalMap_[i] = j;
+            }
+        }
+    }
+
+    // Create a processor list
+    scalarField proc_count(numGlobalForceNodes_,0);
+
+    for(int pointI=0; pointI < numFixedForceNodes_; pointI++)
+    {
+        proc_count[forceLocalGlobalMap_[pointI]]=1;
+    }
+    
+    reduce(proc_count,sumOp<scalarField>());
+    processorCount_ = new int[numGlobalForceNodes_];
+    forAll(proc_count,pointI)
+    {
+        processorCount_[pointI]=proc_count[pointI]; 
+    }
+
+    if(true)
+    {
+        fileName outputFile("forceNodes.txt");
+        OFstream os(db().time().system()/outputFile);
+        os << "Force Nodes, procCount.\n" << endl;
+        os << numGlobalForceNodes_ << "\n{" << endl;
+        for(int i = 0; i < numGlobalForceNodes_; i++)
+        {
+            os << globalForceNodes_[i] << ", " << processorCount_[i] <<  endl;
+        }
+        os << "}" << endl;
+    }
+
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Map from OpenFOAM local to ParaFEM 

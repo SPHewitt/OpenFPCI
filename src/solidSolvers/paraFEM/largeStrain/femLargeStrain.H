@@ -90,8 +90,8 @@ class femLargeStrain
         int jj_;
 
 
-	//- bodyForce
-	double* gravlo_;
+	    //- bodyForce
+	    double* gravlo_;
 
         //- Number of restrained nodes
         int numRestrNodes_;
@@ -107,6 +107,18 @@ class femLargeStrain
 
         //- Node numbers for interface
         int* forceNodes_;
+
+        //- Global list of force specified nodes
+        int* globalForceNodes_;
+
+        //- Mapping between Force local and global nodes
+        int* forceLocalGlobalMap_;
+    
+        //- Total number of global forced nodes
+        int numGlobalForceNodes_;
+
+        //- processor counter
+        int* processorCount_;
 
         //- Force val at interface
         double* fext_OF_;
@@ -132,10 +144,10 @@ class femLargeStrain
         //- Total Points
         int gPoints_;
 
-	//- Displacement Field PF format
-	double* ptDtemp_;
+	    //- Displacement Field PF format
+	    double* ptDtemp_;
 
-	//- Velocity Field PF format
+	    //- Velocity Field PF format
         double* ptUtemp_;
 
         //- Acceleration Field PF format
@@ -144,6 +156,9 @@ class femLargeStrain
         //- Use rbf interpolation
         Switch rbfUpdate_;
 
+        //- Use rbf interpolation
+        Switch primitivePatchUpdate_;
+        
         //- Check if Simulation 2D
         Switch twoDimensional_;
 
