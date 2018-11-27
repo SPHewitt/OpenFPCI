@@ -661,7 +661,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 
     // Debugging
     // Most Errors occur from boundary conditions 
-    if(true)
+    if(false)
     {
         fileName outputFile("rest.txt");
         OFstream os(db().time().system()/outputFile);
@@ -963,7 +963,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         processorCount_[pointI]=proc_count[pointI]; 
     }
 
-    if(true)
+    if(false)
     {
         fileName outputFile("forceNodes.txt");
         OFstream os(db().time().system()/outputFile);
