@@ -25,6 +25,7 @@ Author
     Sam Hewitt, University of Manchester.  All rights reserved
 
 \*----------------------------------------------------------------------------*/
+#include <math.h>
 #include "fvc.H"
 #include "cuttingPlanesFunc.H"
 #include "addToRunTimeSelectionTable.H"
@@ -148,7 +149,8 @@ Foam::cuttingPlanesFunc::cuttingPlanesFunc
     point_(dict.lookup("point")),
     dir_(dict.lookup("dir")),
     planeName_(dict.lookup("name")),
-    startTime_(readScalar(dict.lookup("startTime")))
+    startTime_(readScalar(dict.lookup("startTime"))),
+    writeTime_(readScalar(dict.lookup("writeTime")))
 {
     Info << "Creating " << this->name() << " function object." << endl;
 
@@ -174,7 +176,9 @@ bool Foam::cuttingPlanesFunc::start()
 
 bool Foam::cuttingPlanesFunc::execute()
 {
-    if(time_.write() && time_.value()>=startTime_)
+    double val = fmod(time_.value(),writeTime_);
+    Info << val << endl;
+    if((val < 1e-10) && time_.value()>=startTime_)
     {
         return writeData();
     }
