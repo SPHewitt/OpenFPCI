@@ -177,7 +177,6 @@ bool Foam::cuttingPlanesFunc::start()
 bool Foam::cuttingPlanesFunc::execute()
 {
     double val = fmod(time_.value(),writeTime_);
-    Info << val << endl;
     if((val < 1e-10) && time_.value()>=startTime_)
     {
         return writeData();
