@@ -150,7 +150,8 @@ Foam::cuttingPlanesFunc::cuttingPlanesFunc
     dir_(dict.lookup("dir")),
     planeName_(dict.lookup("name")),
     startTime_(readScalar(dict.lookup("startTime"))),
-    writeTime_(readScalar(dict.lookup("writeTime")))
+    writeTime_(readLabel(dict.lookup("writeTime"))),
+    iterator_(0)
 {
     Info << "Creating " << this->name() << " function object." << endl;
 
@@ -170,16 +171,26 @@ Foam::cuttingPlanesFunc::cuttingPlanesFunc
 
 bool Foam::cuttingPlanesFunc::start()
 {
+    iterator_ = 0;
     return writeData();
 }
 
 
 bool Foam::cuttingPlanesFunc::execute()
-{
-    double val = fmod(time_.value(),writeTime_);
-    if((val < 1e-10) && time_.value()>=startTime_)
+{ 
+    iterator_ = iterator_+1;
+    Info << "Iterator: "<< iterator_ << endl;
+    if(iterator_==writeTime_)
     {
-        return writeData();
+        iterator_=0; 
+        if(time_.value()>=startTime_)
+        {	
+            return writeData();
+        }
+        else
+        {
+        return true;
+        }
     }
     else
     {
@@ -195,6 +206,10 @@ bool Foam::cuttingPlanesFunc::read(const dictionary& dict)
         startTime_ = readScalar(dict.lookup("startTime"));
     }
 
+    if(dict.found("writeTime"))
+    {
+        writeTime_ = readLabel(dict.lookup("writeTime"));
+    }
     return true;
 }
 

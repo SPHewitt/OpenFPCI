@@ -77,7 +77,9 @@ class cuttingPlanesFunc
         scalar startTime_;
     
         //- write time
-        scalar writeTime_;
+        label writeTime_;
+
+        int iterator_;
 
         //- Velocity Field
         wordList meanScalarFields_;
