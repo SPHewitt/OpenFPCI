@@ -43,11 +43,11 @@ using namespace rbf;
 
 // * * * * * * * * * * * * ParaFEM Fortran Subroutines* * * * * * * * * * * * //
 const int ndim 	=  3;	     // Number of Dimensions
-    
+
 using namespace std;
 
 
-// Declaration of Fortran Subroutines 
+// Declaration of Fortran Subroutines
 extern"C"
 {
 
@@ -65,7 +65,7 @@ extern"C"
         double* g_coord_pp
     );
 
-    // return number of equations/proc 
+    // return number of equations/proc
     int findneqpp_();
 
     // return number of cells/proc
@@ -81,7 +81,7 @@ extern"C"
     void runnl_
     (
         int* node,
-        double* val, 
+        double* val,
         double* numVar,
         double* matProp,
         int* nodes,
@@ -94,10 +94,11 @@ extern"C"
         double* gravlo,
         double* ptDtemp_,
         double* ptUtemp_,
-        double* ptAtmep_
+        double* ptAtmep_,
+        int* flag
     );
 
-    // Calculate Gravitational Loads 
+    // Calculate Gravitational Loads
     void gloads_
     (
        double* gravlo,
@@ -153,6 +154,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     E_(0),
     nu_(0),
     rhotmp_(0),
+    timeflag_(0),
     gCells_(0),
     gPoints_(0),
     ptDtemp_(0),
@@ -294,7 +296,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     // Look at first element to get number of nodes
     const int nod 	=  mesh.cellPoints()[0].size();
     const int ntot	=  ndim*nod; // ntot
-    
+
     pointD_.oldTime();
     pointU_.oldTime();
     pointA_.oldTime();
@@ -312,11 +314,11 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     if(solidProperties().found("primitivePatchUpdate"))
     {
         primitivePatchUpdate_ = Switch(solidProperties().lookup("primitivePatchUpdate"));
-        Info << "Primitive Patch Update: " << primitivePatchUpdate_ << endl; 
+        Info << "Primitive Patch Update: " << primitivePatchUpdate_ << endl;
     }
 
 
-    // - ParaFEM construction 
+    // - ParaFEM construction
     E_ 		=  rheology_.law().E()()[0];
     nu_ 	=  rheology_.law().nu()()[0];
     rhotmp_ 	=  rheology_.law().rho()()[0];
@@ -324,7 +326,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     // - Turn on/off the solid mesh Motion
     Switch moveMesh(solidProperties().lookup("moveMesh"));
 
-    
+
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Steering and Coordinate Matricies
 //------------------------------------------------------------------------------
@@ -368,25 +370,25 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
              IOobject::NO_WRITE
         )
     );
-    	
+
     label globalIndex = 0;
 
     forAll(startPoints, pointI)
     {
 	mPoints_[globalIndex++]  =  startPoints[pointI].x();
-	mPoints_[globalIndex++]  =  startPoints[pointI].y();		
+	mPoints_[globalIndex++]  =  startPoints[pointI].y();
 	mPoints_[globalIndex++]  =  startPoints[pointI].z();
     }
-    	
+
     // nels_pp
     const int nels_pp_OF = mesh.nCells();
-    
+
     // Set nels_pp
     setnelspp_(&nels_pp_OF);
 
     //Pout << "nels_pp: " << nels_pp_OF << endl;
 
-    g_num_pp_OF_ = new int [nod*nels_pp_OF]; 
+    g_num_pp_OF_ = new int [nod*nels_pp_OF];
     ptDtemp_     = new double [ntot*nels_pp_OF];
     ptUtemp_     = new double [ntot*nels_pp_OF];
     ptAtemp_     = new double [ntot*nels_pp_OF];
@@ -395,12 +397,12 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     const labelListList& cellPoints = mesh.cellPoints();
 
     label localIndex = 0;
- 
+
     if(Pstream::parRun()==true)
     {
 	forAll(cellPoints, cellI)
 	{
-	    const labelList& curCellPoints = cellPoints[cellI]; 
+	    const labelList& curCellPoints = cellPoints[cellI];
 
 	    if (curCellPoints.size() != nod)
 	    {
@@ -410,7 +412,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	    for(label i=0;i<nod;i++)
 	    {
 		g_num_pp_OF_[localIndex++] = pointProcAddressing_[curCellPoints[i]]+1; // +1 fortran
-	    }	 
+	    }
 	}
     }
     else
@@ -418,7 +420,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         forAll(cellPoints, cellI)
         {
             const labelList& curCellPoints = cellPoints[cellI];
-            
+
  	    if (curCellPoints.size() != nod)
             {
                 Info << "Incorrect cell!" << endl;
@@ -442,7 +444,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     // First Time Get size
     forAll(pointD_.boundaryField(), patchI)
     {
-        if 
+        if
         (
             isA<fixedValuePointPatchVectorField>
             (
@@ -452,8 +454,8 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         {
 	        numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
 	    }
-        
-        if 
+
+        if
         (
             isA<emptyPointPatchVectorField>
             (
@@ -463,28 +465,28 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	    {
 	        numRestrNodes_ += mesh.boundaryMesh()[patchI].meshPoints().size();
 	        twoDimensional_ = true;
-	    }	
+	    }
     }
- 
+
     if(twoDimensional_)
     {
 	    Info << "Simulation is 2D" << endl;
     }
-    // Declare local Restrained List    
+    // Declare local Restrained List
     labelListList localRest(numRestrNodes_);
 
 //------------------------------------------------------------------------------
-//  ParaFEM: Boundary Conditions 
+//  ParaFEM: Boundary Conditions
 //------------------------------------------------------------------------------
-// Special care Needs to be taken here, the current method isn't robust 
+// Special care Needs to be taken here, the current method isn't robust
 
-    int counter = 0;    
+    int counter = 0;
 
     forAll(pointD_.boundaryField(), patchI)
     {
 
         // ------ Fixed Z ------
-        if 
+        if
         (
                 isA<emptyPointPatchVectorField>
                 (
@@ -515,12 +517,12 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         }
 
         // ------ Fixed X Y Z ------
-        if 
+        if
         (
             isA<fixedValuePointPatchVectorField>
             (
                 pointD_.boundaryField()[patchI]
-            ) 
+            )
         )
         {
             const labelList& mp = mesh.boundaryMesh()[patchI].meshPoints();
@@ -556,7 +558,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     }
 
 //------------------------------------------------------------------------------
-//  ParaFEM: gnereating Restrained Array 
+//  ParaFEM: gnereating Restrained Array
 //------------------------------------------------------------------------------
 
     // Sort lists
@@ -564,11 +566,11 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     numRestrNodes_ = localRest.size();
 
     // Gather All Lists
-    List<List<List<label>>> globalRest(Pstream::nProcs(), localRest);   
+    List<List<List<label>>> globalRest(Pstream::nProcs(), localRest);
     //globalRest[Pstream::myProcNo()] = localRest;
 
     Pstream::gatherList(globalRest);
-    Pstream::scatterList(globalRest); 
+    Pstream::scatterList(globalRest);
 
     // Create master Rest;
     reduce(numRestrNodes_,sumOp<double>());
@@ -589,7 +591,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     labelList duplicateNodes;
     duplicateOrder(masterRest,duplicateNodes);
 
-    // Recount number of restrained nodes    
+    // Recount number of restrained nodes
     numRestrNodes_ = 0;
     forAll(masterRest,listI)
     {
@@ -607,8 +609,8 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         else
         {
 	    // If doesnt exist insert into rest
-            numRestrNodes_++;	
-        } 
+            numRestrNodes_++;
+        }
     }
 
     rest_ = new int [numRestrNodes_*4];
@@ -619,7 +621,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     {
         rest_[i]=0.0;
     }
-    
+
     // Generating the Rest array is very buggy
     // Currently masterRest is structured as follows
     // node,x,y,z
@@ -655,12 +657,12 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
             rest_[ numRestrNodes_* 1 + restIndex ] =  masterRest[listI][1];
             rest_[ numRestrNodes_* 2 + restIndex ] =  masterRest[listI][2];
             rest_[ numRestrNodes_* 3 + restIndex ] =  masterRest[listI][3];
-            restIndex++;	
+            restIndex++;
         }
     }
 
     // Debugging
-    // Most Errors occur from boundary conditions 
+    // Most Errors occur from boundary conditions
     if(false)
     {
         fileName outputFile("rest.txt");
@@ -675,7 +677,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
             os << rest_[numRestrNodes_* 3 + i]  << endl;
         }
         os << "}" << endl;
-    }   
+    }
 
 
 //------------------------------------------------------------------------------
@@ -685,53 +687,76 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     g_g_pp_OF_ 	    =  new int [ntot*nels_pp_OF];
     g_coord_pp_OF_  =  new double [nod*ndim*nels_pp_OF];
 
-    // Newmarks method 
-    double beta (readScalar(solidProperties().lookup("beta")));
-    double delta (readScalar(solidProperties().lookup("delta")));
-    
-    // Tolerances    
+    // Tolerances
     // Default Values
     double tol   = 1e-6;
     double tol2  = 1e-5;
     double limit = 1000;
     double rayA = 0.0;
     double rayB = 0.0;
-    
+
+    // Numerical scheme defaults to Newmarks-beta, beta = 0.25
+    double beta = 0.25;
+    double delta = 0.5;
+
+    // radius = 1.0 - no numerical damping
+    // radius = 0   - full numerical damping
+    double radius = 0.0;
+
     if (solidProperties().found("PCGTolerance"))
     {
         tol = readScalar(solidProperties().lookup("PCGTolerance"));
     }
-    
+
     if (solidProperties().found("PCGLimit"))
     {
         limit = readScalar(solidProperties().lookup("PCGLimit"));
     }
-    
+
     if (solidProperties().found("NRTolerance"))
     {
         tol2 = readScalar(solidProperties().lookup("NRTolerance"));
     }
-    
+
     if (solidProperties().found("RayA"))
     {
         rayA = readScalar(solidProperties().lookup("RayA"));
         Info << "Rayleigh Constant A: " << rayA << endl;
     }
-    
+
     if (solidProperties().found("RayB"))
     {
         rayB = readScalar(solidProperties().lookup("RayB"));
         Info << "Rayleigh Constant B: " << rayB << endl;
     }
-    
-    numSchemes_     =  new double[7];
+
+    if (solidProperties().found("radius"))
+    {
+        radius = readScalar(solidProperties().lookup("radius"));
+        Info << "Spectral Radius: " << radius << endl;
+    }
+
+    if (solidProperties().found("beta"))
+    {
+        beta = readScalar(solidProperties().lookup("beta"));
+        Info << "beta: " << beta << endl;
+    }
+
+    if (solidProperties().found("delta"))
+    {
+        delta = readScalar(solidProperties().lookup("delta"));
+        Info << "delta: " << delta << endl;
+    }
+
+    numSchemes_     =  new double[8];
     numSchemes_[0]  =  beta;  // Beta  (Typically = 0.25)
     numSchemes_[1]  =  delta; // Delta (Typically = 0.5)
-    numSchemes_[2]  =  rayA;  // Rayleigh Damping A
-    numSchemes_[3]  =  rayB;  // Rayleigh Damping B
-    numSchemes_[4]  =  tol;   // Tolerance for PCG loop
-    numSchemes_[5]  =  limit; // Max number of PCG iterations
-    numSchemes_[6]  =  tol2;  // Tolerance for NR Loop
+    numSchemes_[2]  =  radius;// radius  (Typically = 1.0)
+    numSchemes_[3]  =  rayA;  // Rayleigh Damping A
+    numSchemes_[4]  =  rayB;  // Rayleigh Damping B
+    numSchemes_[5]  =  tol;   // Tolerance for PCG loop
+    numSchemes_[6]  =  limit; // Max number of PCG iterations
+    numSchemes_[7]  =  tol2;  // Tolerance for NR Loop
 
     solidProps_     =  new double[3];
     solidProps_[0]  =  E_;
@@ -761,36 +786,43 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 
     // Must follow initparafem
     const int neq_pp_OF = findneqpp_();
-   
+
 //------------------------------------------------------------------------------
 //  ParaFEM: Find Gravitry loading if set in dictionary
 //------------------------------------------------------------------------------
 
-    double gravity(readScalar(solidProperties().lookup("gravity")));
+    vector g(solidProperties().lookup("gravity"));
+    Info << g << endl;
+
+    double gravity = mag(g);
+    Info << gravity << endl;
 
     gravlo_ = new double [neq_pp_OF];
 
     if(gravity > 1e-6)
-    { 
-	Info << "Gravity Loading, gravity: " << gravity << " m/s^2" << endl; 
+    {
+	    Info << "Gravity Loading, gravity: " << g << " m/s^2" << endl;
 
-	// Specific weight lambda = rho * g (gloads: negative y implied)
-	double specWeight=gravity*rhotmp_;;
-	int nodof=3;	    
+	    // Specific weight lambda = rho * g (gloads: negative y implied)
+        int nodof=3;
+        double weight[3];
+        weight[0]=g.x()*rhotmp_;
+        weight[1]=g.y()*rhotmp_;
+	    weight[2]=g.z()*rhotmp_;
 
-	gloads_ 
-	(
-	    gravlo_,
-	    &specWeight,
-	    &gPoints_,
-	    &nodof,
-	    &nod,
-	    &ndim,
-	    &numRestrNodes_,
-	    mPoints_,
-	    g_num_pp_OF_,
-	    rest_
-	);
+        gloads_
+	    (
+	        gravlo_,
+	        weight,
+	        &gPoints_,
+	        &nodof,
+	        &nod,
+	        &ndim,
+	        &numRestrNodes_,
+	        mPoints_,
+	        g_num_pp_OF_,
+	        rest_
+	    );
     }
     else
     {
@@ -799,7 +831,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	    gravlo_[i]=0.0;
  	}
     }
-    
+
 
 //------------------------------------------------------------------------------
 //  ParaFEM: Create Force Arrays
@@ -816,7 +848,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
             )
         )
         {
-            numFixedForceNodes_ += 
+            numFixedForceNodes_ +=
 				mesh.boundaryMesh()[patchI].meshPoints().size();
         }
     }
@@ -837,14 +869,14 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
         )
         {
   	    // Local Point
-	    const labelList& mp = 
+	    const labelList& mp =
                 mesh.boundaryMesh()[patchI].meshPoints();
 
             if (Pstream::parRun())
             {
 	    	jj_=0;
 	    	forAll(mp, pI)
-            	{			  
+            	{
 		    // Global Point
 		    label myP = pointProcAddressing_[mp[pI]];
 	 	    forceNodes_[gi++] = myP+1;
@@ -855,10 +887,10 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	    {
 	    	jj_=0;
 	    	forAll(mp, pI)
-                {	
+                {
 		    forceNodes_[gi++] = mp[pI]+1;
  		    jj_=jj_+3;
-	        }		
+	        }
 	    }
     	} // if
     } // forAll
@@ -873,7 +905,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 //------------------------------------------------------------------------------
 //  Create global forced nodes array
 // -----------------------------------------------------------------------------
-    // Declare local force nodes List    
+    // Declare local force nodes List
     labelList localNodes(numFixedForceNodes_);
 
     // Populate the local list
@@ -887,11 +919,11 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     int numlocalNodes = localNodes.size();
 
     // Create a global list
-    List<List<label>> globalNodes(Pstream::nProcs(), localNodes);   
-    
+    List<List<label>> globalNodes(Pstream::nProcs(), localNodes);
+
     // Gather All Lists
     Pstream::gatherList(globalNodes);
-    Pstream::scatterList(globalNodes); 
+    Pstream::scatterList(globalNodes);
 
     // Create master nodes list;
     reduce(numlocalNodes,sumOp<int>());
@@ -913,7 +945,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     //labelList duplicateNodes;
     duplicateOrder(masterNodes,duplicateNodes);
 
-    // Create globalForceNodes_   
+    // Create globalForceNodes_
     numGlobalForceNodes_ = masterNodes.size()-duplicateNodes.size();
     globalForceNodes_ = new int [numGlobalForceNodes_];
     nodeIndex=0;
@@ -929,7 +961,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	     // If doesnt exist insert into rest
              globalForceNodes_[nodeIndex]=masterNodes[pointI];
              nodeIndex++;
-         } 
+         }
     }
 
     // Now create local to global mapping
@@ -940,7 +972,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     {
         // loop through global values
         for(int j =0; j < numGlobalForceNodes_;j++)
-        {  
+        {
             if(forceNodes_[i]==globalForceNodes_[j])
             {
                 forceLocalGlobalMap_[i] = j;
@@ -955,12 +987,12 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     {
         proc_count[forceLocalGlobalMap_[pointI]]=1;
     }
-    
+
     reduce(proc_count,sumOp<scalarField>());
     processorCount_ = new int[numGlobalForceNodes_];
     forAll(proc_count,pointI)
     {
-        processorCount_[pointI]=proc_count[pointI]; 
+        processorCount_[pointI]=proc_count[pointI];
     }
 
     if(false)
@@ -978,7 +1010,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 
 
 //------------------------------------------------------------------------------
-//  ParaFEM: Create Map from OpenFOAM local to ParaFEM 
+//  ParaFEM: Create Map from OpenFOAM local to ParaFEM
 //------------------------------------------------------------------------------
 
     vectorField& pointDI = pointD_.internalField();
@@ -997,7 +1029,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 	    }
 
 	    label index  =  0;
-	    label iel    =  0;  
+	    label iel    =  0;
 
 	    label resizeval=0;
 	    label counter=0;
@@ -1016,18 +1048,18 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
 		    index=0;
 		}
 
-		if(value==g_num_pp_OF_[i])		
-		{ 
+		if(value==g_num_pp_OF_[i])
+		{
 		    resizeval++;
 		    myLabel[counter]=(iel*ntot)+(index*ndim);
 		    counter++;
 		}
 
 		index++;
-	    }	// end for loop	
+	    }	// end for loop
 	    myLabel.resize(resizeval);
 	    of2pfmap_[pointI] = myLabel;
-            
+
 	} // end for all
 
     delete[] mPoints_;
@@ -1035,7 +1067,6 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     delete[] rest_;
     delete[] nodeensi_;
     delete[] sense_;
-
 } // End Constructor
 
 
@@ -1087,16 +1118,16 @@ tmp<vectorField> femLargeStrain::patchPointDisplacementIncrement
     (
         new vectorField
         (
-            mesh().boundaryMesh()[patchID].localPoints().size(), 
+            mesh().boundaryMesh()[patchID].localPoints().size(),
             vector::zero
         )
     );
 
 
-    tPointDisplacement() = 
+    tPointDisplacement() =
         vectorField
         (
-            pointD_.internalField() - pointD_.oldTime().internalField(), 
+            pointD_.internalField() - pointD_.oldTime().internalField(),
             mesh().boundaryMesh()[patchID].meshPoints()
         );
 
@@ -1114,7 +1145,7 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacementIncrement
     (
         new vectorField
         (
-            mesh().faceZones()[zoneID]().localPoints().size(), 
+            mesh().faceZones()[zoneID]().localPoints().size(),
             vector::zero
         )
     );
@@ -1123,10 +1154,10 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacementIncrement
 
     const vectorField& pointDI = pointD_.internalField();
     const vectorField& oldPointDI = pointD_.oldTime().internalField();
-    
+
     label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
- 
-   
+
+
     // global zone index is set in the decomposeParDict
     if (globalZoneIndex != -1)
 //    if (false)
@@ -1136,7 +1167,7 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacementIncrement
 
         const labelList& curPointMap =
             globalToLocalFaceZonePointMap()[globalZoneIndex];
-           
+
         const labelList& zoneMeshPoints =
             mesh().faceZones()[zoneID]().meshPoints();
 
@@ -1149,23 +1180,23 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacementIncrement
         //- Inter-proc points are shared by multiple procs
         //  pointNumProc is the number of procs which a point lies on
         scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-        
+
         forAll(zonePointsDisplGlobal, globalPointI)
         {
             label localPoint = curPointMap[globalPointI];
-	    
+
             if(zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
-                
-                zonePointsDisplGlobal[globalPointI] = 
+
+                zonePointsDisplGlobal[globalPointI] =
                     pointDI[procPoint] - oldPointDI[procPoint];
 
                 pointNumProcs[globalPointI] = 1;
             }
         }
 
-// The following block was commented out and im not sure why 
+// The following block was commented out and im not sure why
 
         if (Pstream::parRun())
         {
@@ -1180,18 +1211,18 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacementIncrement
         forAll(pointDisplacement, globalPointI)
         {
             label localPoint = curPointMap[globalPointI];
-	    
-            pointDisplacement[localPoint] = 
+
+            pointDisplacement[localPoint] =
                 zonePointsDisplGlobal[globalPointI];
         }
     }
     else
     {
 
-        tPointDisplacement() = 
+        tPointDisplacement() =
             vectorField
             (
-                pointDI - oldPointDI, 
+                pointDI - oldPointDI,
                 mesh().faceZones()[zoneID]().meshPoints()
             );
 
@@ -1211,15 +1242,15 @@ tmp<vectorField> femLargeStrain::patchPointDisplacement
     (
         new vectorField
         (
-            mesh().boundaryMesh()[patchID].localPoints().size(), 
+            mesh().boundaryMesh()[patchID].localPoints().size(),
             vector::zero
         )
     );
 
-    tPointDisplacement() = 
+    tPointDisplacement() =
         vectorField
         (
-            pointD_.oldTime().internalField(), 
+            pointD_.oldTime().internalField(),
             mesh().boundaryMesh()[patchID].meshPoints()
         );
 
@@ -1237,7 +1268,7 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacement
     (
         new vectorField
         (
-            mesh().faceZones()[zoneID]().localPoints().size(), 
+            mesh().faceZones()[zoneID]().localPoints().size(),
             vector::zero
         )
     );
@@ -1264,7 +1295,7 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacement
             zoneMeshPoints.size(),
             vector::zero
         );
-        
+
         //- Inter-proc points are shared by multiple procs
         //  pointNumProc is the number of procs which a point lies on
         scalarField pointNumProcs(zoneMeshPoints.size(), 0);
@@ -1272,12 +1303,12 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacement
         forAll(zonePointsDisplGlobal, globalPointI)
         {
             label localPoint = curPointMap[globalPointI];
-	    
+
             if(zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
-                
-                zonePointsDisplGlobal[globalPointI] = 
+
+                zonePointsDisplGlobal[globalPointI] =
                     oldPointDI[procPoint];
 
                 pointNumProcs[globalPointI] = 1;
@@ -1299,16 +1330,16 @@ tmp<vectorField> femLargeStrain::faceZonePointDisplacement
         {
             label localPoint = curPointMap[globalPointI];
 
-            pointDisplacement[localPoint] = 
+            pointDisplacement[localPoint] =
                 zonePointsDisplGlobal[globalPointI];
         }
     }
     else
     {
-        tPointDisplacement() = 
+        tPointDisplacement() =
             vectorField
             (
-                oldPointDI, 
+                oldPointDI,
                 mesh().faceZones()[zoneID]().meshPoints()
             );
     }
@@ -1359,12 +1390,12 @@ tmp<vectorField> femLargeStrain::faceZoneAcceleration
 
     vectorField patchAcceleration = a.boundaryField()[patchID];
 
-    const label patchStart = 
+    const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
     forAll(patchAcceleration, i)
     {
-        acceleration[mesh().faceZones()[zoneID].whichFace(patchStart + i)] = 
+        acceleration[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
             patchAcceleration[i];
     }
 
@@ -1394,12 +1425,12 @@ tmp<vectorField> femLargeStrain::faceZoneVelocity
 
     vectorField patchVelocity = U_.boundaryField()[patchID];
 
-    const label patchStart = 
+    const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
     forAll(patchVelocity, i)
     {
-        velocity[mesh().faceZones()[zoneID].whichFace(patchStart + i)] = 
+        velocity[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
             patchVelocity[i];
     }
 
@@ -1430,12 +1461,12 @@ tmp<tensorField> femLargeStrain::faceZoneSurfaceGradientOfVelocity
 }
 
 
-tmp<vectorField> 
+tmp<vectorField>
 femLargeStrain::currentFaceZonePoints(const label zoneID) const
 {
     vectorField pointDisplacement
     (
-        mesh().faceZones()[zoneID]().localPoints().size(), 
+        mesh().faceZones()[zoneID]().localPoints().size(),
         vector::zero
     );
 
@@ -1457,7 +1488,7 @@ femLargeStrain::currentFaceZonePoints(const label zoneID) const
             zoneMeshPoints.size(),
             vector::zero
         );
-        
+
         //- Inter-proc points are shared by multiple procs
         //  pointNumProc is the number of procs which a point lies on
         scalarField pointNumProcs(zoneMeshPoints.size(), 0);
@@ -1465,12 +1496,12 @@ femLargeStrain::currentFaceZonePoints(const label zoneID) const
         forAll(zonePointsDisplGlobal, globalPointI)
         {
             label localPoint = curPointMap[globalPointI];
-	    
+
             if(zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
-                
-                zonePointsDisplGlobal[globalPointI] = 
+
+                zonePointsDisplGlobal[globalPointI] =
                     pointDI[procPoint];
 
                 pointNumProcs[globalPointI] = 1;
@@ -1489,17 +1520,17 @@ femLargeStrain::currentFaceZonePoints(const label zoneID) const
         forAll(pointDisplacement, globalPointI)
         {
             label localPoint = curPointMap[globalPointI];
-	    
-            pointDisplacement[localPoint] = 
+
+            pointDisplacement[localPoint] =
                 zonePointsDisplGlobal[globalPointI];
         }
     }
     else
     {
-        pointDisplacement = 
+        pointDisplacement =
             vectorField
             (
-                pointDI, 
+                pointDI,
                 mesh().faceZones()[zoneID]().meshPoints()
             );
     }
@@ -1508,7 +1539,7 @@ femLargeStrain::currentFaceZonePoints(const label zoneID) const
     (
         new vectorField
         (
-            mesh().faceZones()[zoneID]().localPoints() 
+            mesh().faceZones()[zoneID]().localPoints()
           + pointDisplacement
         )
     );
@@ -1561,7 +1592,7 @@ tmp<vectorField> femLargeStrain::faceZoneNormal
     {
         // global face zone
 
-        const label patchStart = 
+        const label patchStart =
             mesh().boundaryMesh()[patchID].start();
 
         forAll(patchNormals, i)
@@ -1569,7 +1600,7 @@ tmp<vectorField> femLargeStrain::faceZoneNormal
             normals
             [
                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] = 
+            ] =
                 patchNormals[i];
         }
 
@@ -1597,11 +1628,11 @@ void femLargeStrain::setTraction
     )
     {
         FatalErrorIn("void femLargeStrain::setTraction(...)")
-            << "Bounary condition on " << D_.name() 
-                <<  " is " 
-                << D_.boundaryField()[patchID].type() 
+            << "Bounary condition on " << D_.name()
+                <<  " is "
+                << D_.boundaryField()[patchID].type()
                 << "for patch" << mesh().boundary()[patchID].name()
-                << ", instead " 
+                << ", instead "
                 << tractionDisplacementFvPatchVectorField::typeName
                 << abort(FatalError);
     }
@@ -1628,11 +1659,11 @@ void femLargeStrain::setPressure
     )
     {
         FatalErrorIn("void femLargeStrain::setTraction(...)")
-            << "Bounary condition on " << D_.name() 
-                <<  " is " 
-                << D_.boundaryField()[patchID].type() 
+            << "Bounary condition on " << D_.name()
+                <<  " is "
+                << D_.boundaryField()[patchID].type()
                 << "for patch" << mesh().boundary()[patchID].name()
-                << ", instead " 
+                << ", instead "
                 << tractionDisplacementFvPatchVectorField::typeName
                 << abort(FatalError);
     }
@@ -1655,7 +1686,7 @@ void femLargeStrain::setTraction
 {
     vectorField patchTraction(mesh().boundary()[patchID].size(), vector::zero);
 
-    const label patchStart = 
+    const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
     forAll(patchTraction, i)
@@ -1681,7 +1712,7 @@ void femLargeStrain::setPressure
 {
     scalarField patchPressure(mesh().boundary()[patchID].size(), 0.0);
 
-    const label patchStart = 
+    const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
     forAll(patchPressure, i)
@@ -1717,11 +1748,11 @@ void femLargeStrain::setVelocityAndTraction
             "void femLargeStrain::"
             "setVelocityAndTraction(...)"
         )
-            << "Bounary condition on " << D_.name() 
-                <<  " is " 
-                << D_.boundaryField()[patchID].type() 
+            << "Bounary condition on " << D_.name()
+                <<  " is "
+                << D_.boundaryField()[patchID].type()
                 << "for patch" << mesh().boundary()[patchID].name()
-                << ", instead " 
+                << ", instead "
                 << velocityTractionDisplacementFvPatchVectorField::typeName
                 << abort(FatalError);
     }
@@ -1736,7 +1767,7 @@ void femLargeStrain::setVelocityAndTraction
     patchU.velocity() = velocity;
     patchU.normal() = normal;
 }
-   
+
 //- Set traction at specified patch
 void femLargeStrain::setVelocityAndTraction
 (
@@ -1751,7 +1782,7 @@ void femLargeStrain::setVelocityAndTraction
     vectorField patchVelocity(mesh().boundary()[patchID].size(), vector::zero);
     vectorField patchNormal(mesh().boundary()[patchID].size(), vector::zero);
 
-    const label patchStart = 
+    const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
     forAll(patchTraction, i)
@@ -1775,9 +1806,9 @@ void femLargeStrain::setVelocityAndTraction
 
     setVelocityAndTraction
     (
-        patchID, 
-        patchTraction, 
-        patchVelocity, 
+        patchID,
+        patchTraction,
+        patchVelocity,
         patchNormal
     );
 }
@@ -1796,11 +1827,11 @@ tmp<vectorField> femLargeStrain::predictTraction
     )
     {
         FatalErrorIn("void femLargeStrain::setTraction(...)")
-            << "Bounary condition on " << D_.name() 
-                <<  " is " 
-                << D_.boundaryField()[patchID].type() 
+            << "Bounary condition on " << D_.name()
+                <<  " is "
+                << D_.boundaryField()[patchID].type()
                 << "for patch" << mesh().boundary()[patchID].name()
-                << ", instead " 
+                << ", instead "
                 << tractionDisplacementFvPatchVectorField::typeName
                 << abort(FatalError);
     }
@@ -1843,7 +1874,7 @@ tmp<vectorField> femLargeStrain::predictTraction
 
 tmp<scalarField> femLargeStrain::predictPressure
 (
-    const label patchID, 
+    const label patchID,
     const label zoneID
 )
 {
@@ -1855,11 +1886,11 @@ tmp<scalarField> femLargeStrain::predictPressure
     )
     {
         FatalErrorIn("void femLargeStrain::setTraction(...)")
-            << "Bounary condition on " << D_.name() 
-                <<  " is " 
-                << D_.boundaryField()[patchID].type() 
+            << "Bounary condition on " << D_.name()
+                <<  " is "
+                << D_.boundaryField()[patchID].type()
                 << "for patch" << mesh().boundary()[patchID].name()
-                << ", instead " 
+                << ", instead "
                 << tractionDisplacementFvPatchVectorField::typeName
                 << abort(FatalError);
     }
@@ -1884,7 +1915,7 @@ tmp<scalarField> femLargeStrain::predictPressure
     );
     scalarField& pF = tpF();
 
-    const label patchStart = 
+    const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
     forAll(pPF, i)
@@ -1900,9 +1931,21 @@ tmp<scalarField> femLargeStrain::predictPressure
 
 bool femLargeStrain::evolve()
 {
-    Info << "Evolving solid solver: " 
+    Info << "Evolving solid solver: "
         << femLargeStrain::typeName << endl;
-    
+
+        int femFlag = 1;
+
+        if(timeflag_ == runTime().value())
+        {
+           femFlag = 1;
+        }
+        else //Next time Step
+        {
+           timeflag_= runTime().value();
+           femFlag = 2;
+        }
+
     double dtim = runTime().deltaT().value();
     int nod = mesh().cellPoints()[0].size();
 
@@ -1911,7 +1954,7 @@ bool femLargeStrain::evolve()
 
     // Interpolating Face to Point Forces
     #include "updateForce.H"
- 
+
     vectorField& oldPointDI = pointD_.oldTime().internalField();
     vectorField& oldPointUI = pointU_.oldTime().internalField();
     vectorField& oldPointAI = pointA_.oldTime().internalField();
@@ -1919,7 +1962,7 @@ bool femLargeStrain::evolve()
     // Copy data OF-PF
     forAll(oldPointDI, pointI)
     {
-	
+
 	forAll(of2pfmap_[pointI],value)
 	{
 	    ptDtemp_[of2pfmap_[pointI][value] + 0]  =  oldPointDI[pointI].x();
@@ -1932,12 +1975,12 @@ bool femLargeStrain::evolve()
 
 	    ptAtemp_[of2pfmap_[pointI][value] + 0]  =  oldPointAI[pointI].x();
 	    ptAtemp_[of2pfmap_[pointI][value] + 1]  =  oldPointAI[pointI].y();
-	    ptAtemp_[of2pfmap_[pointI][value] + 2]  =  oldPointAI[pointI].z(); 
+	    ptAtemp_[of2pfmap_[pointI][value] + 2]  =  oldPointAI[pointI].z();
 	}
-	
+
     }
 
-    
+
 //------------------------------------------------------------------------------
 //  ParaFEM: Run ParaFEM Code
 //------------------------------------------------------------------------------
@@ -1957,7 +2000,8 @@ bool femLargeStrain::evolve()
         gravlo_,
         ptDtemp_,
         ptUtemp_,
-        ptAtemp_
+        ptAtemp_,
+        &femFlag
     );
 
 
@@ -1980,17 +2024,18 @@ bool femLargeStrain::evolve()
         pointAI[pointI].y() = ptAtemp_[of2pfmap_[pointI][0] + 1];
         pointAI[pointI].z() = ptAtemp_[of2pfmap_[pointI][0] + 2];
     }
-    
+
 
     // Calculate Cauchy Green Stress Tensor
     {
-	D_ = pointToVol_.interpolate(pointD_);
+	      D_ = pointToVol_.interpolate(pointD_);
+        U_ = pointToVol_.interpolate(pointU_);
         //epsilon_ = symm(fvc::grad(D_));
 
         //sigma_ = 2*mu_*epsilon_ + I*(lambda_*tr(epsilon_));
     }
 
-    //    U_ = pointToVol_.interpolate(pointU_); 
+
     //    A_ = pointToVol_.interpolate(pointA_);
     return true;
 }
@@ -2059,7 +2104,7 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
     if (moveMesh)
     {
 
-	// startPoints is the reference coordinates of 
+	// startPoints is the reference coordinates of
 	// initial configuration
 
 	pointIOField startPoints
@@ -2098,12 +2143,12 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
         }
 
 
-        // Unused points (procedure developed by Philip Cardiff, UCD) 
+        // Unused points (procedure developed by Philip Cardiff, UCD)
         forAll(globalFaceZones(), zoneI)
         {
             const label curZoneID = globalFaceZones()[zoneI];
 
-            const labelList& curMap = 
+            const labelList& curMap =
                 globalToLocalFaceZonePointMap()[zoneI];
 
             const labelList& curZoneMeshPoints =
@@ -2111,7 +2156,7 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
 
             vectorField curGlobalZonePointDispl
             (
-                curZoneMeshPoints.size(), 
+                curZoneMeshPoints.size(),
                 vector::zero
             );
 
@@ -2122,13 +2167,13 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
             forAll(curGlobalZonePointDispl, globalPointI)
             {
                 label localPoint = curMap[globalPointI];
-	    
+
                 if(curZoneMeshPoints[localPoint] < mesh().nPoints())
                 {
                     label procPoint = curZoneMeshPoints[localPoint];
-                
+
                     curGlobalZonePointDispl[globalPointI] = pointDI[procPoint];
-                
+
                     pointNumProcs[globalPointI] = 1;
                 }
             }
@@ -2143,13 +2188,13 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
             }
 
 
-            //- The curZonePointsDisplGlobal now contains the correct 
-            //  face zone displacement in a global master processor order, 
+            //- The curZonePointsDisplGlobal now contains the correct
+            //  face zone displacement in a global master processor order,
             //  now convert them back into the local proc order
 
             vectorField curZonePointDispl
             (
-                curZoneMeshPoints.size(), 
+                curZoneMeshPoints.size(),
                 vector::zero
             );
 
@@ -2157,7 +2202,7 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
             {
                 label localPoint = curMap[globalPointI];
 
-                curZonePointDispl[localPoint] = 
+                curZonePointDispl[localPoint] =
                     curGlobalZonePointDispl[globalPointI];
             }
 
@@ -2171,7 +2216,7 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
                }
             }
         }
-        
+
         twoDPointCorrector twoDCorrector(mesh());
         twoDCorrector.correctPoints(curPoints);
 
@@ -2195,8 +2240,8 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
     Info<< "Max sigmaEq = " << max(sigmaEq).value()
         << endl;
 
-    Info<< "SigmaEq, max: " << gMax(sigmaEq.internalField()) 
-        << ", avg: " << gAverage(sigmaEq.internalField()) 
+    Info<< "SigmaEq, max: " << gMax(sigmaEq.internalField())
+        << ", avg: " << gAverage(sigmaEq.internalField())
         << ", min: " << gMin(sigmaEq.internalField()) << endl;
 
 
@@ -2243,14 +2288,14 @@ Switch moveMesh(solidProperties().lookup("moveMesh"));
 
             pointSigma.internalField().replace
             (
-                cmpt, 
+                cmpt,
                 cmptPointSigma.internalField()
-            );            
+            );
         }
 
         pointSigma.write();
     }
-   
+
     return true;
 }
 

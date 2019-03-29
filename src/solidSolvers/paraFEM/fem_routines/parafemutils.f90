@@ -1033,7 +1033,7 @@
   REAL(iwp)               :: g_coord(ndim,nn),pmul_pp(ntot,nels_pp)
   REAL(iwp)               :: load_pp(ndim*nn)
 
-  REAL(iwp),INTENT(IN)    :: specWeight
+  REAL(iwp),INTENT(IN)    :: specWeight(3)
 
   REAL(iwp),INTENT(INOUT) :: gravlo_pp(neq_pp)
 
@@ -1063,11 +1063,20 @@
       jac=MATMUL(der,g_coord_pp(:,:,iel))
       det=determinant(jac)
       CALL shape_fun(fun,points,i)
+
+      pmul_pp(1:ndof-2:3,iel)=pmul_pp(1:ndof-2:3,iel)+fun(:)*det*weights(i)
       pmul_pp(2:ndof-1:3,iel)=pmul_pp(2:ndof-1:3,iel)+fun(:)*det*weights(i)
+      pmul_pp(3:ndof-0:3,iel)=pmul_pp(3:ndof-0:3,iel)+fun(:)*det*weights(i)
+
     END DO gauss_points_1
 
     ! Sign included here to donate negative Y
-    pmul_pp(:,iel)=-pmul_pp(:,iel)*specWeight
+
+    pmul_pp(1:ndof-2:3,iel)=pmul_pp(1:ndof-2:3,iel)*specWeight(1)
+    pmul_pp(2:ndof-1:3,iel)=pmul_pp(2:ndof-1:3,iel)*specWeight(2)
+    pmul_pp(3:ndof-0:3,iel)=pmul_pp(3:ndof-0:3,iel)*specWeight(3)
+
+    ! pmul_pp(:,iel)=-pmul_pp(:,iel)*specWeight
   END DO elements_1
 
   gravlo_pp = zero 
@@ -1534,7 +1543,7 @@
       RETURN
   END FUNCTION
 
-  INTEGER FUNCTION calcnelsppof(nels,npes)
+  INTEGER FUNCTION calcnelsppof(nels,npes,procnum)
 
   !/****f* parafemutils/calcnelsppof
   !*  NAME
@@ -1556,11 +1565,13 @@
   !*    S. Hewitt
   !*
   !******
+  !* procNum can be replaced by numpe but compile complains about
+  !* ambiguous references
   !*
   USE precision; USE global_variables;
   IMPLICIT NONE
 
-  INTEGER, INTENT(IN)	:: nels,npes
+  INTEGER, INTENT(IN)	:: nels,npes,procnum
   INTEGER             :: num_nels_pp1, nels_pp1, nels_pp2,iel_start
 
     IF (npes == 1) THEN
@@ -1576,13 +1587,13 @@
       ELSE
         nels_pp1   = nels_pp2 + 1
       ENDIF
-      IF (numpe <= num_nels_pp1 .OR. num_nels_pp1 == 0) THEN
+      IF (procnum <= num_nels_pp1 .OR. num_nels_pp1 == 0) THEN
         nels_pp    = nels_pp1
-        iel_start  = (numpe - 1)*nels_pp1 + 1
+        iel_start  = (procnum - 1)*nels_pp1 + 1
       ELSE
         nels_pp    = nels_pp2
         iel_start  = num_nels_pp1*nels_pp1+                                 &
-                     (numpe-num_nels_pp1-1)*(nels_pp1-1)+1
+                     (procnum-num_nels_pp1-1)*(nels_pp1-1)+1
       ENDIF
     ENDIF
   calcnelsppof=1

@@ -67,7 +67,7 @@ class femLargeStrain
     public solidSolver
 {
     // Private data
-  
+
         //- An array for the StressMesh Points Data
         double* mPoints_;
 
@@ -81,7 +81,7 @@ class femLargeStrain
         int* g_num_pp_OF_;
 
         //- Global neq matrix
-        int*  g_g_pp_OF_; 
+        int*  g_g_pp_OF_;
 
         //- Coordinate matrix per processor
          double* g_coord_pp_OF_;
@@ -113,7 +113,7 @@ class femLargeStrain
 
         //- Mapping between Force local and global nodes
         int* forceLocalGlobalMap_;
-    
+
         //- Total number of global forced nodes
         int numGlobalForceNodes_;
 
@@ -138,6 +138,9 @@ class femLargeStrain
         //- temporary Density
         double rhotmp_;
 
+        //- temporary Density
+        double timeflag_;
+
         //- Total Cells
         int gCells_;
 
@@ -158,7 +161,7 @@ class femLargeStrain
 
         //- Use rbf interpolation
         Switch primitivePatchUpdate_;
-        
+
         //- Check if Simulation 2D
         Switch twoDimensional_;
 
@@ -186,7 +189,7 @@ class femLargeStrain
         //- Strain field
         volSymmTensorField epsilon_;
 
-        //- Point Processor Addressing 
+        //- Point Processor Addressing
         labelIOList pointProcAddressing_;
 
         //- Cell Processor Addressing
@@ -194,7 +197,7 @@ class femLargeStrain
 
         //- An array for global to Local point Map (evolve Solid)
         labelListList of2pfmap_;
-	
+
         //- Rheology model
         constitutiveModel rheology_;
 
