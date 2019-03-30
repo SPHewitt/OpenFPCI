@@ -263,7 +263,14 @@
   !*    acceleration and external force field. Loads the structure
   !*    and solves the governing equations of the problem
   !*
-  !*        {R} = {Fint} - {Fext} + [M]{a} + [K]{d} + [C]{u}
+  !*        {R} = {Fint}(x_a) - {Fext}(x_a) + [M]{ddx_a} + [K]{x_a} + [C]{dx_a}
+  !*
+  !*         ddx_a = (1-alphaM)* ddx_n+1 + alphaM * ddx_n
+  !*         dx_a  = (1-alphaF)* dx_n+1 + alphaF * dx_n
+  !*         x_a   = (1-alphaF)* x_n+1 + alphaF * x_n
+  !*         {Fext}(x_a) = (1-alphaF)* Fext_n+1 + alphaF * Fext_n
+  !*         {Fint}(x_a) = Fint( (1-alphaF)* x_n+1 + alphaF * x_n )
+  !*                    ~ (1-alphaF)* Fint_n+1 + alphaF * Fint_n
   !*
   !*    The new displacement, velocity and acceleration fields are
   !*    output. This subroutine is used for problems with finite strain
@@ -423,8 +430,8 @@
 
   dtim    =  timeStep
 
-  ! If Radius equals zero it defaults to Newmark
-  IF (radius < 1E-6)THEN
+  ! If Radius less than 0 it defaults to Newmark
+  IF (radius < 0.0)THEN
       alpha_m = 0.0
       alpha_f = 0.0
   ELSE
@@ -486,6 +493,18 @@
    ALLOCATE(fext_o_pp(0:neq_pp))
    fext_o_pp  =  zero
    fint_o_pp  =  zero
+   IF (radius < 0.0)THEN
+     IF(numpe .EQ. 1)WRITE(*,'(A)')"Radius less than 0.0"
+     IF(numpe .EQ. 1)WRITE(*,'(A)')"Using NEWMARKS SCHEME"
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"Beta: ",beta
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"delta: ",delta
+   ELSE
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"Radius: ",radius
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"alphaM: ",alpha_m
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"alphaF: ",alpha_f
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"Beta: ",beta
+     IF(numpe .EQ. 1)WRITE(*,'(A,F5.3)')"delta: ",delta
+   ENDIF
   ENDIF
 
   !---- Clean Arrays ------
@@ -731,22 +750,8 @@
       nr_timest(inewton,3)= timest(11)-timest(10)
 
 !-------------------------------------------------------------------------
-! 9. Newmark Scheme
+! 9. Generalised Alpha Scheme
 !-------------------------------------------------------------------------
-
-    ! New mark parameters
-    ! Damping excluded
-    ! Finite element procedures in engineering analysis, K‐J. Bathe, Prentice‐Hall, 1982, doi:10.1002/nag.1610070412
-    ! Pages 511-513
-
-     !a0  = 1.0/(beta*(dtim**2.0))
-     !a1  = delta/(beta*dtim)
-     !a2  = 1.0/(beta*dtim)
-     !a3  = (1.0/( 2.0*beta)) -1.0
-     !a4  = (delta/beta) - 1.0
-     !a5  = (dtim/2)*((delta/beta)-2.0)
-     !a6  = dtim*(1-delta)
-     !a7  = delta*dtim
 
      a0  = (1.0-alpha_f)/(beta*(dtim**2.0))
      a1  = ((1.0-alpha_f)*delta)/(beta*dtim)
