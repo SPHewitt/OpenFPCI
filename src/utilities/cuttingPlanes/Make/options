@@ -8,7 +8,8 @@ EXE_INC = -std=c++11 \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/lagrangian/basic/lnInclude \
     -I$(LIB_SRC)/surfMesh/lnInclude \
-    -I$(LIB_SRC)/sampling/lnInclude
+    -I$(LIB_SRC)/sampling/lnInclude \
+    -I$(LIB_SRC)/postProcessing/functionObjects/field/lnInclude
 
 
 LIB_LIBS = \
@@ -19,4 +20,5 @@ LIB_LIBS = \
     -lmeshTools \
     -lsurfMesh \
     -lsampling \
+    -lfieldFunctionObjects \
     -L$(FOAM_USER_LIBBIN)

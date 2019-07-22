@@ -753,10 +753,12 @@
 ! 9. Generalised Alpha Scheme
 !-------------------------------------------------------------------------
 
-     a0  = (1.0-alpha_f)/(beta*(dtim**2.0))
+     a0  = (1.0-alpha_m)/(beta*(dtim**2.0))
      a1  = ((1.0-alpha_f)*delta)/(beta*dtim)
-     a2  = (1.0-alpha_f)/(beta*dtim)
+
+     a2  = (1.0-alpha_m)/(beta*dtim)
      a3  = ((1.0-alpha_m)/( 2.0*beta)) -1.0
+     
      a4  = ( ((1-alpha_f)*delta)/beta ) - 1.0
      a5  = (dtim/2)*((delta/beta)-2.0)*(1-alpha_f)
 
@@ -805,6 +807,8 @@
      ! {r_pp}
      r_pp(1:) = (1-alpha_f)*fext_pp(1:) + alpha_f*fext_o_pp(1:) - ((1-alpha_f)*fint_pp(1:) &
                 + alpha_f*fint_o_pp(1:)) + vu_pp(1:) + xu_pp(1:)
+     !r_pp(1:) = fext_pp(1:) + - ((1-alpha_f)*fint_pp(1:) &
+     !           + alpha_f*fint_o_pp(1:)) + vu_pp(1:) + xu_pp(1:)
 
      ! Compute maxdiff of residual
      maxdiff =  MAXABSVAL_P(r_pp(1:))

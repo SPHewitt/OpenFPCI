@@ -606,9 +606,9 @@
 ! 13. Update Velocity and Acceleration
 !-------------------------------------------------------------------------
 
- a0  = (dtim*dtim)/(2.0)
- a1  = (dtim)/(2.0)
- a3  = (2.0)/(dtim*dtim)
+   a0  = (dtim*dtim)/(2.0)
+   a1  = (dtim)/(2.0)
+   a3  = (2.0)/(dtim*dtim)
 
    timest(15)     =  elap_time()
 

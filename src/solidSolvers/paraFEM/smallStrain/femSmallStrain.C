@@ -1818,12 +1818,12 @@ bool femSmallStrain::evolve()
     
 
     // Calculate Cauchy Green Stress Tensor
-    {
+    //{
 	D_ = pointToVol_.interpolate(pointD_);
-        epsilon_ = symm(fvc::grad(D_));
+    //    epsilon_ = symm(fvc::grad(D_));
 
-        sigma_ = 2*mu_*epsilon_ + I*(lambda_*tr(epsilon_));
-    }
+    //    sigma_ = 2*mu_*epsilon_ + I*(lambda_*tr(epsilon_));
+    //}
 
     //    U_ = pointToVol_.interpolate(pointU_); 
     //    A_ = pointToVol_.interpolate(pointA_);

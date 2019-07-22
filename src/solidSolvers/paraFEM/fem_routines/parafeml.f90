@@ -284,7 +284,7 @@
   REAL(iwp)                :: c1,c2,c3,c4
   REAL(iwp)                :: X,Y,Z
 
-  REAL(iwp),SAVE           :: time_step_orig
+  REAL(iwp),SAVE           :: time_step_orig,time
   
   LOGICAL                  :: converged
   CHARACTER(LEN=50)        :: argv
@@ -388,7 +388,7 @@
   timest(2)  =  elap_time()
 
   fext_pp    =  zero
-
+  
   ! Load fext_pp based on global load vector
   CALL load(g_g_pp,g_num_pp,node,val,fext_pp)
  
@@ -509,8 +509,9 @@
 !------------------------------------------------------------------------------
    !CALL MPI_BARRIER(MPI_COMM_WORLD,ier)
    
-   IF(numpe .EQ. 1)PRINT*,"Number of PCG Iterations: ",iters
+     IF(numpe .EQ. 1)PRINT*,"Number of PCG Iterations: ",iters
    ENDIF
+
    x1_pp      =  xnew_pp
    utemp_pp   =  zero
    d1x1_pp    =  (x1_pp-x0_pp)/(theta*dtim)-d1x0_pp*(1._iwp-theta)/theta

@@ -78,7 +78,8 @@ extern"C"
     );
 
     // Solve the structural equation
-    void runnl_
+    //void runnl_
+    void runbd_
     (
         int* node,
         double* val,
@@ -386,7 +387,7 @@ femLargeStrain::femLargeStrain(const fvMesh& mesh)
     // Set nels_pp
     setnelspp_(&nels_pp_OF);
 
-    //Pout << "nels_pp: " << nels_pp_OF << endl;
+    Pout << "nels_pp: " << nels_pp_OF << endl;
 
     g_num_pp_OF_ = new int [nod*nels_pp_OF];
     ptDtemp_     = new double [ntot*nels_pp_OF];
@@ -1984,7 +1985,8 @@ bool femLargeStrain::evolve()
 //------------------------------------------------------------------------------
 //  ParaFEM: Run ParaFEM Code
 //------------------------------------------------------------------------------
-    runnl_
+    //runnl_
+    runbd_
     (
         forceNodes_,
         fext_OF_,
