@@ -28,7 +28,7 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         2.1;
+endTime         5;
 
 deltaT          1e-3;
 
@@ -36,7 +36,7 @@ writeControl    timeStep;
 
 writeInterval   10;
 
-purgeWrite      0;
+purgeWrite      5;
 
 writeFormat     ascii;
 
