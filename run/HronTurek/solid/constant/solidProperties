@@ -24,7 +24,8 @@ femLargeStrainCoeffs
   
     moveMesh yes;
 
-    gravity (0 0 0);
+//    gravity (0 0 0);
+    gravity 0.0;
 
     beta 0.4;
     delta 0.6;
