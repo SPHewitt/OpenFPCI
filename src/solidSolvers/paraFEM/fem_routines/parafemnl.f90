@@ -895,8 +895,14 @@
 
     END DO iterations
 
-   IF(numpe .EQ. 1)WRITE(*,'(a,I3,a,ES10.3)')," Newton-Raphson Iters: ",inewton,&
-                                        ",  Final residual: ", (energy/energy1)
+    IF (numpe .EQ. 1) THEN
+      IF (ABS(energy1) .lt. 1e-8) THEN
+        WRITE(*,'(a,I3)')," Newton-Raphson Iters: ",inewton
+      ELSE
+        WRITE(*,'(a,I3,a,ES10.3)')," Newton-Raphson Iters: ",inewton,&
+                                          ",  Final residual: ", (energy/energy1)
+      ENDIF
+    ENDIF
 
    nr_timest(inewton,7)= elap_time()-timest(14)
 
